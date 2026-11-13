@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>CRT Oscilloscope</title>
+<style>
+    :root {
+        --bg: #0d0f0d;
+        --panel: #181b18;
+        --line: #2c332c;
+        --amber: #ffcc66;
+        --k: 1;                              /* соотношение сторон экрана */
+        --hb: 68dvh;                         /* высота, которую экран может занять */
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); }
+    body {
+        color: #dfe6df;
+        font-family: system-ui, -apple-system, sans-serif;
+        touch-action: manipulation;
+        user-select: none; -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior: none;
+    }
+    .app {
+        display: flex; flex-direction: column; gap: 10px;
+        padding: 10px;
+        padding-top: max(10px, env(safe-area-inset-top));
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
+        padding-left: max(10px, env(safe-area-inset-left));
+        padding-right: max(10px, env(safe-area-inset-right));
+        max-width: 760px; margin: 0 auto;
+    }
+    .stage { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+    .screen {
+        position: relative;
+        width: min(100%, calc(var(--hb) * var(--k)));
+        aspect-ratio: var(--k);
+        background: #020403;
+        border: 2px solid #2b352b;
+        border-radius: 10px;
+        box-shadow: inset 0 0 30px #000, 0 0 0 4px #0a0c0a;
+        overflow: hidden;
+    }
+    .screen.yt { --k: 1.3333; }
+    .screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    #grid { pointer-events: none; }
+    .overlay { position: absolute; top: 6px; right: 6px; display: flex; gap: 6px; z-index: 3; }
+    .ibtn {
+        width: 36px; height: 36px; border-radius: 8px;
+        background: rgba(20,28,20,.55); color: #bfe8c6; border: 1px solid rgba(120,200,130,.25);
+        display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer;
+    }
+    .ibtn:active { transform: scale(.94); }
+    .status { font-size: 12px; color: #7d8d7d; text-align: center; min-height: 15px; }
+    .panel {
+        display: flex; flex-direction: column; gap: 12px;
+        background: var(--panel); border: 1px solid var(--line);
+        border-radius: 10px; padding: 14px; width: 100%;
+    }
+    .row { display: flex; gap: 8px; }
+    .btn {
+        flex: 1; background: #2a2f2a; color: #fff; border: 1px solid #4a524a;
+        padding: 13px 6px; border-radius: 8px; font-size: 15px; font-weight: 600;
+        text-align: center; cursor: pointer;
+    }
+    .btn.small { font-size: 13px; padding: 10px 6px; }
+    .btn.active { background: var(--amber); color: #111; border-color: var(--amber); }
+    .btn:active { transform: scale(.97); }
+    .knob { display: flex; flex-direction: column; gap: 2px; }
+    .knob label { color: var(--amber); font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; }
+    .knob label span { color: #9aa59a; font-weight: 400; }
+    input[type=range] { width: 100%; height: 28px; accent-color: var(--amber); margin: 0; cursor: pointer; }
+    .knob select {
+        width: 100%; min-height: 36px; padding: 7px 9px; border-radius: 7px;
+        background: #2a2f2a; color: #dfe6df; border: 1px solid #4a524a;
+        font: inherit; font-size: 13px; accent-color: var(--amber);
+    }
+    .hidden { display: none !important; }
+    .app.nopanel .panel { display: none; }
+
+    @media (orientation: portrait) { .screen { --hb: 66dvh; } .app.nopanel .screen { --hb: 90dvh; } }
+    @media (orientation: landscape) {
+        .app { max-width: none; flex-direction: row; height: 100dvh; align-items: stretch; margin: 0; }
+        .stage { flex: 1 1 auto; justify-content: center; }
+        .screen { --hb: calc(100dvh - 40px); }
+        .panel { width: min(360px, 42vw); flex: 0 0 auto; overflow-y: auto; max-height: calc(100dvh - 20px); }
+    }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+    <div class="stage">
+        <div class="screen" id="screen">
+            <canvas id="beam"></canvas>
+            <canvas id="grid"></canvas>
+            <div class="overlay">
+                <div class="ibtn" id="fsBtn" title="Во весь экран">⛶</div>
+                <div class="ibtn" id="panelBtn" title="Панель">☰</div>
+            </div>
+        </div>
+        <div class="status" id="fps"></div>
+        <div class="status" id="status">Загрузите аудиофайл (лучше WAV/FLAC — без потерь)</div>
+    </div>
+
+    <div class="panel" id="panel">
+        <div class="row">
+            <label class="btn" for="audioFile" id="fileLabel">🎵 Файл</label>
+            <input type="file" id="audioFile" accept="audio/*,.wav,.flac,.mp3,.ogg,.m4a" class="hidden">
+            <div class="btn" id="micBtn">🎙 Микрофон</div>
+        </div>
+        <div class="row">
+            <div class="btn" id="playBtn">▶ Играть</div>
+            <div class="btn active" id="modeBtn">MODE: X-Y</div>
+        </div>
+
+        <div class="knob">
+            <label>ПОЗИЦИЯ <span id="timeLabel">0:00 / 0:00</span></label>
+            <input type="range" id="seek" min="0" max="1000" step="1" value="0">
+        </div>
+        <div class="knob">
+            <label>ГРОМКОСТЬ</label>
+            <input type="range" id="volKnob" min="0" max="1" step="0.01" value="0.8">
+        </div>
+        <div class="knob">
+            <label>СИНХРОНИЗАЦИЯ, мс <span id="syncVal"></span></label>
+            <input type="range" id="syncKnob" min="-300" max="600" step="5" value="0">
+        </div>
+        <div class="knob">
+            <label>МАСШТАБ (V/DIV) <span id="voltVal"></span></label>
+            <input type="range" id="voltKnob" min="0.1" max="3" step="0.05" value="1">
+        </div>
+        <div class="knob">
+            <label>ТОК ЛУЧА (BEAM CURRENT) <span id="brightVal"></span></label>
+            <input type="range" id="brightKnob" min="0.2" max="4" step="0.05" value="1">
+        </div>
+        <div class="knob">
+            <label>ФОКУС (толщина луча) <span id="focusVal"></span></label>
+            <input type="range" id="focusKnob" min="0.3" max="2" step="0.05" value="0.6">
+        </div>
+        <div class="knob">
+            <label>ГАШЕНИЕ ЛУЧА (Z-AXIS) <span id="blankVal"></span></label>
+            <input type="range" id="blankKnob" min="0" max="1" step="0.05" value="0.95">
+        </div>
+        <div class="knob">
+            <label>ПОРОГ ОБНАРУЖЕНИЯ ПЕРЕХОДА <span id="zThresholdVal"></span></label>
+            <input type="range" id="zThresholdKnob" min="1.5" max="4.5" step="0.1" value="2.2">
+        </div>
+        <div class="knob">
+            <label>ПОСЛЕСВЕЧЕНИЕ, мс <span id="persistVal"></span></label>
+            <input type="range" id="persistKnob" min="1" max="150" step="1" value="10">
+        </div>
+        <div class="knob">
+            <label>ПРОФИЛЬ ЛЮМИНОФОРА (X-Y) <span id="phosphorVal">Стандартный</span></label>
+            <select id="phosphorSelect">
+                <option value="fast">Быстрый — короткий след</option>
+                <option value="standard" selected>Стандартный — сбалансированный</option>
+                <option value="dual">Двойной — выраженный хвост</option>
+                <option value="long">Длинный — длительное послесвечение</option>
+            </select>
+        </div>
+        <div class="knob">
+            <label>СВЕЧЕНИЕ СТЕКЛА (GAUSSIAN) <span id="glowVal"></span></label>
+            <input type="range" id="glowKnob" min="0" max="1.5" step="0.05" value="0.45">
+        </div>
+        <div class="knob" id="timeGroup">
+            <label>TIME/DIV (окно Y-T, сэмплов) <span id="timeVal"></span></label>
+            <input type="range" id="timeKnob" min="256" max="8192" step="256" value="2048">
+        </div>
+        <div class="row">
+            <div class="btn small active" id="autoBtn">АВТО-ЯРКОСТЬ</div>
+            <div class="btn small active" id="qualBtn">КАЧЕСТВО: ВЫСОКОЕ</div>
+            <div class="btn small" id="curveBtn">ТРАЕКТОРИЯ: RAW</div>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+
+const appEl = $('app'), screenEl = $('screen');
+const beamCv = $('beam'), gridCv = $('grid');
+const gctx = gridCv.getContext('2d');
+const statusEl = $('status'), fpsEl = $('fps');
+const fileInput = $('audioFile'), fileLabel = $('fileLabel');
+const micBtn = $('micBtn'), playBtn = $('playBtn'), modeBtn = $('modeBtn');
+const seekEl = $('seek'), timeLabel = $('timeLabel'), volKnob = $('volKnob');
+const voltKnob = $('voltKnob'), brightKnob = $('brightKnob'), focusKnob = $('focusKnob'), blankKnob = $('blankKnob');
+const zThresholdKnob = $('zThresholdKnob'), phosphorSelect = $('phosphorSelect');
+const persistKnob = $('persistKnob'), glowKnob = $('glowKnob'), timeKnob = $('timeKnob');
+const syncKnob = $('syncKnob');
+const timeGroup = $('timeGroup'), autoBtn = $('autoBtn'), qualBtn = $('qualBtn'), curveBtn = $('curveBtn');
+
+let isXY = true, autoBright = true, hiQuality = true, smoothPath = false;
+const num = el => parseFloat(el.value);
+
+// ───────────────────────── Аудио ─────────────────────────
+let audioCtx = null, gainNode = null, splitter = null, anL = null, anR = null;
+let buf = null, chL = null, chR = null, sr = 44100, dur = 0, fileName = '';
+let src = null, playing = false, startCtx = 0, startOff = 0, pausedOff = 0, lastAbs = 0;
+let mic = false, micStream = null, micSrc = null;
+let carryOK = false;                       // непрерывность луча между кадрами
+let detectedSourceRate = null;
+let contextRequestedRate = null;
+let fileLoadSerial = 0;
+
+// Анализируем файл в его собственной частоте дискретизации. AudioContext
+// выдаёт буфер в source rate, а аудиосистема браузера пересчитывает звук
+// отдельно под физический аудиовыход при воспроизведении.
+// Это сохраняет геометрию исходного сигнала для XY-трассы.
+function detectSourceSampleRate(buffer) {
+    const b = new Uint8Array(buffer);
+    const n = b.length;
+    const ascii = (i, text) => {
+        if (i < 0 || i + text.length > n) return false;
+        for (let k = 0; k < text.length; k++) if (b[i + k] !== text.charCodeAt(k)) return false;
+        return true;
+    };
+    const u32le = i => i + 4 <= n ? (b[i] | (b[i+1] << 8) | (b[i+2] << 16) | (b[i+3] << 24)) >>> 0 : 0;
+    const u32be = i => i + 4 <= n ? ((b[i] << 24) | (b[i+1] << 16) | (b[i+2] << 8) | b[i+3]) >>> 0 : 0;
+
+    // RIFF/WAVE: sampleRate находится в fmt chunk, смещение +4 от начала данных.
+    if (ascii(0, 'RIFF') && ascii(8, 'WAVE')) {
+        let p = 12;
+        while (p + 8 <= n) {
+            const size = u32le(p + 4), data = p + 8;
+            if (ascii(p, 'fmt ') && size >= 16 && data + 16 <= n) return u32le(data + 4) || null;
+            if (size > n || data + size > n) break;
+            p = data + size + (size & 1);
+        }
+    }
+
+    // FLAC STREAMINFO: частота — старшие 20 бит поля sampleRate/channels/bps.
+    if (ascii(0, 'fLaC') && n >= 42) {
+        const data = 8;
+        if ((b[4] & 0x7f) === 0 && ((b[5] << 16) | (b[6] << 8) | b[7]) >= 34) {
+            const rate = (b[data + 10] << 12) | (b[data + 11] << 4) | (b[data + 12] >>> 4);
+            if (rate >= 8000 && rate <= 384000) return rate;
+        }
+    }
+
+    // Ogg Vorbis identification header; Opus всегда декодируется в 48 kHz.
+    const scanLimit = Math.min(n - 16, 1_000_000);
+    for (let i = 0; i < scanLimit; i++) {
+        if (ascii(i, 'OpusHead')) return 48000;
+        if (b[i] === 1 && ascii(i + 1, 'vorbis')) {
+            const rate = u32le(i + 12);
+            if (rate >= 8000 && rate <= 384000) return rate;
+        }
+    }
+
+    // MP3: находим первый валидный MPEG audio frame (с учётом ID3v2).
+    let mp3Start = 0;
+    if (ascii(0, 'ID3') && n >= 10) {
+        const tagSize = ((b[6] & 0x7f) << 21) | ((b[7] & 0x7f) << 14) | ((b[8] & 0x7f) << 7) | (b[9] & 0x7f);
+        mp3Start = Math.min(n, 10 + tagSize + ((b[5] & 0x10) ? 10 : 0));
+    }
+    const mp3Rates = [44100, 48000, 32000];
+    for (let i = mp3Start; i < Math.min(n - 4, mp3Start + 65536); i++) {
+        const h = u32be(i);
+        if (((h & 0xffe00000) >>> 0) !== 0xffe00000) continue;
+        const version = (h >>> 19) & 3, layer = (h >>> 17) & 3, idx = (h >>> 10) & 3;
+        if (version === 1 || layer === 0 || idx === 3) continue;
+        const base = mp3Rates[idx];
+        const rate = version === 3 ? base : version === 2 ? base / 2 : base / 4;
+        if (rate >= 8000) return rate;
+    }
+
+    // MP4/M4A AudioSampleEntry (mp4a): samplerate — 16.16 fixed-point.
+    for (let i = 4; i < scanLimit; i++) {
+        if (!ascii(i, 'mp4a')) continue;
+        const fixed = u32be(i + 28);
+        const rate = fixed >>> 16;
+        if (rate >= 8000 && rate <= 192000) return rate;
+    }
+    return null;
+}
+
+let MAX_N = 4000;
+let sx = new Float32Array(16384), sy = new Float32Array(16384);
+const tmpL = new Float32Array(4096), tmpR = new Float32Array(4096);
+let QX = new Float32Array(MAX_N + 4), QY = new Float32Array(MAX_N + 4);
+function resizeSampleBuffers(sampleRate) {
+    // Поддерживаем окно до 50 мс без потери сэмплов даже при 96/192 kHz.
+    MAX_N = Math.max(4000, Math.min(32768, Math.ceil(sampleRate * 0.05) + 8));
+    sx = new Float32Array(Math.max(MAX_N, 16384));
+    sy = new Float32Array(Math.max(MAX_N, 16384));
+    QX = new Float32Array(MAX_N + 4);
+    QY = new Float32Array(MAX_N + 4);
+}
+
+function initAudio(requestedRate = null) {
+    if (audioCtx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const options = { latencyHint: 'playback' };
+    if (requestedRate && Number.isFinite(requestedRate)) options.sampleRate = requestedRate;
+    try { audioCtx = new AC(options); }
+    catch (_) { audioCtx = new AC({ latencyHint: 'playback' }); }
+    contextRequestedRate = requestedRate || null;
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = num(volKnob);
+    gainNode.connect(audioCtx.destination);
+    splitter = audioCtx.createChannelSplitter(2);
+    anL = audioCtx.createAnalyser(); anR = audioCtx.createAnalyser();
+    anL.fftSize = 4096; anR.fftSize = 4096;
+    anL.smoothingTimeConstant = 0; anR.smoothingTimeConstant = 0;
+    splitter.connect(anL, 0); splitter.connect(anR, 1);
+}
+async function configureAudioContext(requestedRate) {
+    const needsNew = !audioCtx ||
+        (requestedRate ? audioCtx.sampleRate !== requestedRate : contextRequestedRate !== null);
+    if (!needsNew) return;
+    if (src) stopSrc();
+    if (mic) stopMic();
+    if (audioCtx) {
+        try { await audioCtx.close(); } catch (_) {}
+        audioCtx = null; gainNode = null; splitter = null; anL = null; anR = null;
+        contextRequestedRate = null;
+    }
+    initAudio(requestedRate);
+}
+async function resumeCtx() {
+    initAudio();
+    if (audioCtx.state !== 'running') await audioCtx.resume();
+}
+
+const fmt = s => { s = Math.max(0, s | 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const outLatency = () => audioCtx ? (audioCtx.outputLatency || audioCtx.baseLatency || 0) : 0;
+
+// Часы воспроизведения: позиция звука, который реально выходит из динамика.
+// getOutputTimestamp() даёт contextTime «сейчас на выходе» + момент измерения;
+// экстраполируем по performance.now() и сглаживаем смещение — тогда позиция
+// растёт ровно, а не кусками, как currentTime на Android.
+let clkOff = null;                                   // (контекстное время) − (performance.now()/1000)
+function updateClock() {
+    if (!audioCtx || !playing) return;
+    const pn = performance.now();
+    let est;
+    const ts = audioCtx.getOutputTimestamp ? audioCtx.getOutputTimestamp() : null;
+    if (ts && ts.contextTime > 0 && ts.performanceTime > 0) est = ts.contextTime + (pn - ts.performanceTime) / 1000;
+    else est = audioCtx.currentTime - outLatency();
+    const o = est - pn / 1000;
+    if (clkOff === null || Math.abs(o - clkOff) > 0.2) clkOff = o;
+    else clkOff += (o - clkOff) * 0.05;
+}
+function ctxNow() {
+    return clkOff === null ? audioCtx.currentTime - outLatency() : performance.now() / 1000 + clkOff;
+}
+const syncSec = () => num(syncKnob) / 1000;          // + = картинка позже звука
+function posUnwrapped() {
+    if (!playing) return pausedOff;
+    return Math.max(startOff, ctxNow() - startCtx + startOff - syncSec());
+}
+const wrap = t => dur ? ((t % dur) + dur) % dur : 0;
+
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const loadSerial = ++fileLoadSerial;
+    try {
+        stopMic(); stopSrc(); playing = false; setPlayUI();
+        buf = null; chL = null; chR = null;
+        statusEl.textContent = 'Анализирую формат и декодирую…';
+        const encoded = await file.arrayBuffer();
+        if (loadSerial !== fileLoadSerial) return;
+        detectedSourceRate = detectSourceSampleRate(encoded);
+        await configureAudioContext(detectedSourceRate);
+        if (loadSerial !== fileLoadSerial) return;
+        const decoded = await audioCtx.decodeAudioData(encoded.slice(0));
+        if (loadSerial !== fileLoadSerial) return;
+        buf = decoded;
+        chL = buf.getChannelData(0);
+        chR = buf.numberOfChannels > 1 ? buf.getChannelData(1) : chL;
+        sr = buf.sampleRate; dur = buf.duration; fileName = file.name;
+        resizeSampleBuffers(sr);
+        pausedOff = 0; lastAbs = 0; carryOK = false; lastNX = 0; lastNY = 0;
+        seekEl.value = 0; timeLabel.textContent = '0:00 / ' + fmt(dur);
+        const rateInfo = detectedSourceRate
+            ? ` · источник ${detectedSourceRate} Гц · анализ ${sr} Гц${sr === detectedSourceRate ? ' (без пересчёта)' : ' (пересчитан браузером)'}`
+            : ` · анализ ${sr} Гц (частота источника не определена)`;
+        statusEl.textContent = `${fileName}${rateInfo} · выход: ресемплинг аудиосистемой · ` + (buf.numberOfChannels > 1 ? 'стерео' : 'моно (X = Y, будет диагональ)');
+    } catch (err) {
+        if (loadSerial !== fileLoadSerial) return;
+        buf = null; chL = null; chR = null;
+        statusEl.textContent = 'Не удалось прочитать файл';
+        console.error('Audio decode/configuration failed:', err);
+        alert('Ошибка чтения. Попробуйте WAV, FLAC или MP3.');
+    } finally {
+        if (loadSerial === fileLoadSerial) fileInput.value = '';
+    }
+});
+
+function stopSrc() { if (src) { try { src.stop(); } catch (_) {} src.disconnect(); src = null; } }
+function startSrc() {
+    stopSrc();
+    src = audioCtx.createBufferSource();
+    src.buffer = buf; src.loop = true; src.connect(gainNode);
+    const when = audioCtx.currentTime + 0.12;            // старт на заранее известный момент, а не «когда получится»
+    src.start(when, wrap(pausedOff));
+    startCtx = when; startOff = pausedOff; clkOff = null;
+    lastAbs = Math.floor(startOff * sr); carryOK = false;
+}
+async function play() {
+    try { await resumeCtx(); startSrc(); playing = true; setPlayUI(); }
+    catch (err) { statusEl.textContent = 'Не удалось запустить аудиодвижок'; console.error(err); }
+}
+function pause() {
+    pausedOff = wrap(posUnwrapped() + syncSec()); stopSrc(); playing = false;   // позиция именно звука
+    lastAbs = Math.floor(pausedOff * sr); setPlayUI();
+}
+function setPlayUI() {
+    playBtn.textContent = playing ? '⏸ Пауза' : '▶ Играть';
+    playBtn.classList.toggle('active', playing);
+}
+playBtn.addEventListener('click', () => { if (!buf || mic) return; if (playing) pause(); else play(); });
+
+let seeking = false;
+seekEl.addEventListener('input', () => { seeking = true; if (dur) timeLabel.textContent = fmt(seekEl.value / 1000 * dur) + ' / ' + fmt(dur); });
+seekEl.addEventListener('change', () => {
+    if (buf) { pausedOff = seekEl.value / 1000 * dur; if (playing) startSrc(); else { lastAbs = Math.floor(pausedOff * sr); carryOK = false; } }
+    seeking = false;
+});
+
+micBtn.addEventListener('click', async () => {
+    if (mic) { stopMic(); return; }
+    try {
+        await resumeCtx(); if (playing) pause();
+        micStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
+        micSrc = audioCtx.createMediaStreamSource(micStream);
+        micSrc.connect(splitter);
+        sr = audioCtx.sampleRate; mic = true; carryOK = false;
+        micBtn.classList.add('active'); micBtn.textContent = '🛑 Стоп';
+        statusEl.textContent = 'Микрофон';
+    } catch (err) { alert('Нет доступа к микрофону.'); }
+});
+function stopMic() {
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    if (micSrc) { micSrc.disconnect(); micSrc = null; }
+    mic = false; carryOK = false;
+    micBtn.classList.remove('active'); micBtn.textContent = '🎙 Микрофон';
+}
+volKnob.addEventListener('input', () => { if (gainNode) gainNode.gain.value = num(volKnob); });
+try { const v = localStorage.getItem('scopeSyncMs'); if (v !== null) syncKnob.value = v; } catch (_) {}
+syncKnob.addEventListener('input', () => {
+    try { localStorage.setItem('scopeSyncMs', syncKnob.value); } catch (_) {}
+    if (buf && playing) { lastAbs = Math.floor(posUnwrapped() * sr); carryOK = false; }
+});
+
+// подписи ручек
+const fmtVal = { voltVal: v => (+v).toFixed(2), brightVal: v => (+v).toFixed(2), focusVal: v => (+v).toFixed(2),
+                 blankVal: v => Math.round(+v * 100) + '%', zThresholdVal: v => (+v).toFixed(1) + '×',
+                 persistVal: v => v, syncVal: v => (v > 0 ? '+' : '') + v, glowVal: v => (+v).toFixed(2), timeVal: v => v };
+for (const [knob, out] of [[syncKnob,'syncVal'],[voltKnob,'voltVal'],[brightKnob,'brightVal'],[focusKnob,'focusVal'],[blankKnob,'blankVal'],[zThresholdKnob,'zThresholdVal'],
+                           [persistKnob,'persistVal'],[glowKnob,'glowVal'],[timeKnob,'timeVal']]) {
+    const f = () => { $(out).textContent = fmtVal[out](knob.value); };
+    knob.addEventListener('input', f); f();
+}
+const phosphorNames = { fast: 'Быстрый', standard: 'Стандартный', dual: 'Двойной', long: 'Длинный' };
+phosphorSelect.addEventListener('change', () => { $('phosphorVal').textContent = phosphorNames[phosphorSelect.value] || 'Стандартный'; });
+
+// ───────────────────────── Макет и кнопки ─────────────────────────
+function setMode(xy) {
+    isXY = xy;
+    modeBtn.textContent = isXY ? 'MODE: X-Y' : 'MODE: Y-T';
+    modeBtn.classList.toggle('active', isXY);
+    screenEl.classList.toggle('yt', !isXY);
+    timeGroup.classList.toggle('hidden', isXY);
+    carryOK = false; needClear = true;
+}
+modeBtn.addEventListener('click', () => setMode(!isXY));
+autoBtn.addEventListener('click', () => { autoBright = !autoBright; autoBtn.classList.toggle('active', autoBright); });
+qualBtn.addEventListener('click', () => {
+    hiQuality = !hiQuality;
+    qualBtn.classList.toggle('active', hiQuality);
+    qualBtn.textContent = 'КАЧЕСТВО: ' + (hiQuality ? 'ВЫСОКОЕ' : 'НИЗКОЕ');
+    resize();
+});
+curveBtn.addEventListener('click', () => {
+    smoothPath = !smoothPath;
+    curveBtn.classList.toggle('active', smoothPath);
+    curveBtn.textContent = 'ТРАЕКТОРИЯ: ' + (smoothPath ? 'CATMULL' : 'RAW');
+    carryOK = false; needClear = true;
+});
+$('panelBtn').addEventListener('click', () => appEl.classList.toggle('nopanel'));
+$('fsBtn').addEventListener('click', () => {
+    const d = document, el = d.documentElement;
+    if (d.fullscreenElement) d.exitFullscreen && d.exitFullscreen();
+    else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+});
+timeGroup.classList.add('hidden');
+
+// ───────────────────────── Размер, сетка ─────────────────────────
+let W = 0, H = 0, CW = 0, CH = 0, needClear = true;
+
+function resize() {
+    const r = screenEl.getBoundingClientRect();
+    const bw = screenEl.clientLeft, bh = screenEl.clientTop;
+    const w = r.width - 2 * bw, h = r.height - 2 * bh;
+    if (w < 8 || h < 8) return;
+    W = w; H = h;
+    const dpr = hiQuality ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+    const cap = hiQuality ? 1024 : 640;
+    const k = Math.min(1, cap / Math.max(W * dpr, H * dpr));
+    CW = Math.max(16, Math.round(W * dpr * k)); CH = Math.max(16, Math.round(H * dpr * k));
+    beamCv.width = CW; beamCv.height = CH;
+    gridCv.width = Math.round(W * Math.min(window.devicePixelRatio || 1, 2));
+    gridCv.height = Math.round(H * Math.min(window.devicePixelRatio || 1, 2));
+    gctx.setTransform(gridCv.width / W, 0, 0, gridCv.height / H, 0, 0);
+    drawGrid();
+    if (glOK) allocAcc(CW, CH);
+    needClear = true;
+}
+// Сетка — на передней панели стекла, поверх люминофора
+function drawGrid() {
+    gctx.clearRect(0, 0, W, H);
+    const cols = isXY ? 8 : 10, rows = 8;
+    gctx.lineWidth = 1;
+    gctx.strokeStyle = 'rgba(150, 235, 165, 0.16)';
+    gctx.beginPath();
+    for (let i = 1; i < cols; i++) { const x = Math.round(W * i / cols) + 0.5; gctx.moveTo(x, 0); gctx.lineTo(x, H); }
+    for (let j = 1; j < rows; j++) { const y = Math.round(H * j / rows) + 0.5; gctx.moveTo(0, y); gctx.lineTo(W, y); }
+    gctx.stroke();
+    // центральные оси с мелкими засечками (как на настоящей шкале)
+    gctx.strokeStyle = 'rgba(170, 245, 185, 0.30)';
+    gctx.beginPath();
+    const cx = Math.round(W / 2) + 0.5, cy = Math.round(H / 2) + 0.5;
+    gctx.moveTo(cx, 0); gctx.lineTo(cx, H); gctx.moveTo(0, cy); gctx.lineTo(W, cy);
+    const sub = 5;
+    for (let i = 0; i <= cols * sub; i++) { const x = Math.round(W * i / (cols * sub)) + 0.5; gctx.moveTo(x, cy - 3); gctx.lineTo(x, cy + 3); }
+    for (let j = 0; j <= rows * sub; j++) { const y = Math.round(H * j / (rows * sub)) + 0.5; gctx.moveTo(cx - 3, y); gctx.lineTo(cx + 3, y); }
+    gctx.stroke();
+}
+new ResizeObserver(resize).observe(screenEl);
+window.addEventListener('resize', resize);
+
+// ───────────────────────── WebGL2: модель ЭЛТ ─────────────────────────
+// Каждый отрезок траектории луча — инстанс квада. Шейдер считает точный
+// гауссов след с интегрированием вдоль отрезка (через erf): энергия на сэмпл
+// постоянна, значит яркость ∝ времени, проведённому лучом в точке.
+// Энергия копится в HDR-текстуре (R — быстрая компонента люминофора, G — слабый
+// средний, B — медленный хвост), затем тонально сжимается и подмешивается ореол стекла.
+const gl = beamCv.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false,
+                                         powerPreference: 'high-performance' });
+let glOK = false, floatOK = false, accScale = 1;
+let accTex = null, accFbo = null, TW = 0, TH = 0;
+let progBeam, progFade, progDisp, progGlowDown, progGlowBlur, vaoBeam, vaoQuad, bufInst, bufCorner, bufQuad;
+let glowTexA = null, glowTexB = null, glowFboA = null, glowFboB = null;
+let GW = 0, GH = 0, glowAvailable = false;
+const U = {};
+// Инстансный буфер растёт по мере необходимости. Это сохраняет пакет целиком
+// при высоких sampleRate и не обрезает хвост траектории. Жёсткий предел нужен
+// только как защита от аварийного потребления памяти.
+const INITIAL_INST_CAPACITY = 32768, MAX_INST_CAPACITY = 262144, IF = 7;
+let instanceCapacity = INITIAL_INST_CAPACITY;
+let inst = new Float32Array(instanceCapacity * IF);
+let ni = 0;
+let droppedInstances = 0;
+let peakBatchInstances = 0;
+function ensureInstCapacity(required) {
+    if (required <= instanceCapacity) return true;
+    if (required > MAX_INST_CAPACITY) return false;
+    let next = instanceCapacity;
+    while (next < required) next = Math.min(MAX_INST_CAPACITY, next * 2);
+    const grown = new Float32Array(next * IF);
+    grown.set(inst.subarray(0, ni * IF));
+    inst = grown;
+    instanceCapacity = next;
+    return true;
+}
+
+function makeProg(vs, fs) {
+    const mk = (t, s) => {
+        const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o);
+        if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o));
+        return o;
+    };
+    const p = gl.createProgram();
+    gl.attachShader(p, mk(gl.VERTEX_SHADER, vs)); gl.attachShader(p, mk(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+}
+
+function initGL() {
+    if (!gl) throw new Error('нужен WebGL2');
+    floatOK = !!(gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'));
+
+    progBeam = makeProg(
+`#version 300 es
+layout(location=0) in vec2 a_corner;
+layout(location=1) in vec4 a_seg;
+layout(location=2) in vec3 a_E;
+uniform vec2 u_res; uniform float u_sigma;
+out vec3 v_st; out vec3 v_E;
+void main(){
+    vec2 d = a_seg.zw - a_seg.xy;
+    float L = length(d);
+    vec2 u = vec2(1.0, 0.0);
+    if (L > 1e-4) u = d / L;
+    L = max(L, 0.05);
+    vec2 n = vec2(-u.y, u.x);
+    float ext = 4.0 * u_sigma + 0.5;
+    float s = mix(-ext, L + ext, a_corner.x);
+    float t = a_corner.y * ext;
+    vec2 pos = a_seg.xy + u * s + n * t;
+    vec2 c = pos / u_res * 2.0 - 1.0;
+    gl_Position = vec4(c.x, -c.y, 0.0, 1.0);
+    v_st = vec3(s, t, L);
+    v_E = a_E;
+}`,
+`#version 300 es
+precision highp float;
+in vec3 v_st; in vec3 v_E;
+uniform float u_sigma; uniform float u_scale;
+out vec4 o;
+float erf1(float x){
+    float sg = sign(x); x = abs(x);
+    float t = 1.0 / (1.0 + 0.3275911 * x);
+    float p = ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t;
+    return sg * (1.0 - p * exp(-x * x));
+}
+void main(){
+    float k = 0.70710678 / u_sigma;
+    float along = 0.5 * (erf1(v_st.x * k) - erf1((v_st.x - v_st.z) * k));
+    float g = exp(-0.5 * v_st.y * v_st.y / (u_sigma * u_sigma)) / (2.5066283 * u_sigma);
+    float C = g * along / v_st.z;
+    o = vec4(C * v_E, 0.0) * u_scale;
+}`);
+    for (const n of ['u_res', 'u_sigma', 'u_scale']) U['b_' + n] = gl.getUniformLocation(progBeam, n);
+
+    progFade = makeProg(
+`#version 300 es
+layout(location=0) in vec2 a_pos;
+void main(){ gl_Position = vec4(a_pos, 0.0, 1.0); }`,
+`#version 300 es
+precision mediump float;
+out vec4 o;
+void main(){ o = vec4(0.0); }`);
+
+    progDisp = makeProg(
+`#version 300 es
+layout(location=0) in vec2 a_pos;
+out vec2 v_uv;
+void main(){ v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }`,
+`#version 300 es
+precision highp float;
+uniform sampler2D u_acc;
+uniform sampler2D u_glowTex;
+uniform float u_scale, u_glow, u_expo;
+uniform int u_mode;
+in vec2 v_uv; out vec4 o;
+void main(){
+    vec3 a = texture(u_acc, v_uv).rgb;
+    // Glow хранится отдельно и уже прошёл пространственное Gaussian-размытие.
+    // RGB-каналы здесь соответствуют трём временным компонентам люминофора.
+    vec3 bloom = texture(u_glowTex, v_uv).rgb;
+    vec3 e = (a + bloom * (u_glow * 3.0)) * (u_expo / u_scale);
+    vec3 col;
+    if (u_mode == 0) {
+        float lum = 1.0 - exp(-(e.r + e.g + e.b));
+        col = vec3(0.20, 1.0, 0.36) * lum + vec3(0.55, 0.40, 0.55) * pow(lum, 3.0);
+    } else {
+        vec2 l = 1.0 - exp(-e.rg);
+        col = vec3(1.0, 0.30, 0.30) * l.x + vec3(0.30, 1.0, 0.30) * l.y;
+    }
+    col = pow(clamp(col, 0.0, 1.0), vec3(0.62));
+    vec2 q = v_uv - 0.5;
+    col *= 1.0 - 0.9 * dot(q, q);
+    col += vec3(0.004, 0.014, 0.007);
+    o = vec4(col, 1.0);
+}`);
+
+    // Уменьшаем HDR-поле вдвое через 2x2 box filter. Это не mipmap:
+    // тонкая линия интегрируется в низкоразрешённое поле, а затем размывается
+    // двумя отдельными separable Gaussian-проходами.
+    progGlowDown = makeProg(
+`#version 300 es
+layout(location=0) in vec2 a_pos;
+out vec2 v_uv;
+void main(){ v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }`,
+`#version 300 es
+precision highp float;
+uniform sampler2D u_src;
+uniform vec2 u_srcTexel;
+in vec2 v_uv; out vec4 o;
+void main(){
+    vec2 d = u_srcTexel * 0.5;
+    vec3 a = texture(u_src, v_uv + vec2(-d.x, -d.y)).rgb;
+    vec3 b = texture(u_src, v_uv + vec2( d.x, -d.y)).rgb;
+    vec3 c = texture(u_src, v_uv + vec2(-d.x,  d.y)).rgb;
+    vec3 e = texture(u_src, v_uv + vec2( d.x,  d.y)).rgb;
+    o = vec4((a + b + c + e) * 0.25, 1.0);
+}`);
+
+    // Нормированное 5-tap Gaussian-ядро. Два прохода дают круглое размытие
+    // без блочной структуры mipmap и без чтения/записи одной текстуры одновременно.
+    progGlowBlur = makeProg(
+`#version 300 es
+layout(location=0) in vec2 a_pos;
+out vec2 v_uv;
+void main(){ v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }`,
+`#version 300 es
+precision highp float;
+uniform sampler2D u_src;
+uniform vec2 u_step;
+in vec2 v_uv; out vec4 o;
+void main(){
+    vec3 c = texture(u_src, v_uv).rgb * 0.356;
+    c += texture(u_src, v_uv + u_step).rgb * 0.243;
+    c += texture(u_src, v_uv - u_step).rgb * 0.243;
+    c += texture(u_src, v_uv + 2.0 * u_step).rgb * 0.079;
+    c += texture(u_src, v_uv - 2.0 * u_step).rgb * 0.079;
+    o = vec4(c, 1.0);
+}`);
+    for (const n of ['u_acc', 'u_glowTex', 'u_scale', 'u_glow', 'u_expo', 'u_mode']) U['d_' + n] = gl.getUniformLocation(progDisp, n);
+    U.gdown_src = gl.getUniformLocation(progGlowDown, 'u_src');
+    U.gdown_texel = gl.getUniformLocation(progGlowDown, 'u_srcTexel');
+    U.gblur_src = gl.getUniformLocation(progGlowBlur, 'u_src');
+    U.gblur_step = gl.getUniformLocation(progGlowBlur, 'u_step');
+
+    bufCorner = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufCorner);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,-1, 1,-1, 0,1, 1,1]), gl.STATIC_DRAW);
+    bufQuad = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufQuad);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+    bufInst = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufInst);
+    gl.bufferData(gl.ARRAY_BUFFER, inst.byteLength, gl.STREAM_DRAW);
+
+    vaoBeam = gl.createVertexArray(); gl.bindVertexArray(vaoBeam);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufCorner);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufInst);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, IF * 4, 0);  gl.vertexAttribDivisor(1, 1);
+    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, IF * 4, 16); gl.vertexAttribDivisor(2, 1);
+
+    vaoQuad = gl.createVertexArray(); gl.bindVertexArray(vaoQuad);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufQuad);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+    return true;
+}
+
+function allocAcc(w, h) {
+    if (accTex) gl.deleteTexture(accTex);
+    if (accFbo) gl.deleteFramebuffer(accFbo);
+    const levels = 1; // Основная текстура больше не использует mipmaps для Glow.
+    for (let attempt = 0; attempt < 2; attempt++) {
+        accTex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, accTex);
+        gl.texStorage2D(gl.TEXTURE_2D, levels, floatOK ? gl.RGBA16F : gl.RGBA8, w, h);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        accFbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, accFbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, accTex, 0);
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE) break;
+        // HDR недоступен — падаем на 8 бит
+        gl.deleteTexture(accTex); gl.deleteFramebuffer(accFbo);
+        floatOK = false;
+    }
+    accScale = floatOK ? 1 : 0.2;
+    TW = w; TH = h;
+    gl.viewport(0, 0, w, h);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (!floatOK) statusEl.textContent = 'HDR-текстуры недоступны, упрощённый режим (8 бит)';
+    allocGlow(Math.max(1, Math.ceil(w / 2)), Math.max(1, Math.ceil(h / 2)));
+}
+
+function allocGlow(w, h) {
+    for (const t of [glowTexA, glowTexB]) if (t) gl.deleteTexture(t);
+    for (const f of [glowFboA, glowFboB]) if (f) gl.deleteFramebuffer(f);
+    glowTexA = glowTexB = glowFboA = glowFboB = null;
+    glowAvailable = false;
+    GW = w; GH = h;
+    const internal = floatOK ? gl.RGBA16F : gl.RGBA8;
+    function makeTarget() {
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texStorage2D(gl.TEXTURE_2D, 1, internal, w, h);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        const fbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+            gl.deleteTexture(tex); gl.deleteFramebuffer(fbo); return null;
+        }
+        return { tex, fbo };
+    }
+    const a = makeTarget(), b = makeTarget();
+    if (a && b) {
+        glowTexA = a.tex; glowFboA = a.fbo;
+        glowTexB = b.tex; glowFboB = b.fbo;
+        glowAvailable = true;
+    } else {
+        if (a) { gl.deleteTexture(a.tex); gl.deleteFramebuffer(a.fbo); }
+        if (b) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo); }
+        statusEl.textContent = 'Glow FBO недоступен: используется резкий режим без ореола';
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+// ───────────────────────── Сэмплы ─────────────────────────
+function copyFile(startIdx, len) {
+    const N = chL.length;
+    let j = ((startIdx % N) + N) % N;
+    for (let i = 0; i < len; i++) { sx[i] = chL[j]; sy[i] = chR[j]; if (++j === N) j = 0; }
+}
+
+function fetchXY(dt) {
+    if (mic) {
+        anL.getFloatTimeDomainData(tmpL); anR.getFloatTimeDomainData(tmpR);
+        const n = Math.min(Math.max(8, Math.round(sr * dt)), MAX_N, 4096);
+        const off = 4096 - n;
+        for (let i = 0; i < n; i++) { sx[i] = tmpL[off + i]; sy[i] = tmpR[off + i]; }
+        return n;
+    }
+    if (buf && playing) {
+        const cur = Math.floor(posUnwrapped() * sr);
+        let n = cur - lastAbs;
+        if (n < 0) { lastAbs = cur; n = 0; carryOK = false; }
+        const maxN = Math.min(Math.floor(sr * 0.05), MAX_N - 8);
+        if (n > maxN) { lastAbs = cur - maxN; n = maxN; carryOK = false; }
+        if (n > 0) copyFile(lastAbs + 1, n);
+        lastAbs = cur;
+        return n;
+    }
+    return 0;
+}
+
+// ───────────────────────── Кадр ─────────────────────────
+const SQ2PI = 2.5066283;
+let lastNX = 0, lastNY = 0;                  // последняя позиция луча
+let LmeanS = 3;                              // сглаженная средняя длина шага луча (px/сэмпл)
+const carryX = new Float32Array(3), carryY = new Float32Array(3);
+
+
+function addInst(x0, y0, x1, y1, eFast, eMid, eSlow = 0) {
+    if (!ensureInstCapacity(ni + 1)) { droppedInstances++; return; }
+    const o = ni * IF;
+    inst[o] = x0; inst[o+1] = y0; inst[o+2] = x1; inst[o+3] = y1;
+    inst[o+4] = eFast; inst[o+5] = eMid; inst[o+6] = eSlow;
+    ni++;
+}
+
+function fadeAcc(kFast, kMid, kSlow) {
+    gl.useProgram(progFade);
+    gl.bindVertexArray(vaoQuad);
+    gl.blendColor(kFast, kMid, kSlow, 1);
+    gl.blendFunc(gl.ZERO, gl.CONSTANT_COLOR);          // RGB *= (kFast, kMid, kSlow)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function drawBeam(sigma) {
+    if (!ni) return;
+    if (ni > peakBatchInstances) peakBatchInstances = ni;
+    gl.useProgram(progBeam);
+    gl.uniform2f(U.b_u_res, W, H);
+    gl.uniform1f(U.b_u_sigma, sigma);
+    gl.uniform1f(U.b_u_scale, accScale);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    gl.bindVertexArray(vaoBeam);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufInst);
+    gl.bufferData(gl.ARRAY_BUFFER, inst.subarray(0, ni * IF), gl.STREAM_DRAW);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, ni);
+    ni = 0;
+}
+
+function runGlowPass(program, targetFbo, sourceTex, setUniforms) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, targetFbo);
+    gl.viewport(0, 0, GW, GH);
+    gl.disable(gl.BLEND);
+    gl.useProgram(program);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sourceTex);
+    if (setUniforms) setUniforms();
+    gl.bindVertexArray(vaoQuad);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function present(mode, glow, expo) {
+    const useGlow = glow > 0 && hiQuality && glowAvailable;
+    if (useGlow) {
+        // 1) интегрированное уменьшение яркостного поля;
+        // 2) горизонтальный Gaussian;
+        // 3) вертикальный Gaussian.
+        runGlowPass(progGlowDown, glowFboA, accTex, () => {
+            gl.uniform1i(U.gdown_src, 0);
+            gl.uniform2f(U.gdown_texel, 1 / TW, 1 / TH);
+        });
+        runGlowPass(progGlowBlur, glowFboB, glowTexA, () => {
+            gl.uniform1i(U.gblur_src, 0);
+            gl.uniform2f(U.gblur_step, 1 / GW, 0);
+        });
+        runGlowPass(progGlowBlur, glowFboA, glowTexB, () => {
+            gl.uniform1i(U.gblur_src, 0);
+            gl.uniform2f(U.gblur_step, 0, 1 / GH);
+        });
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, CW, CH);
+    gl.disable(gl.BLEND);
+    gl.useProgram(progDisp);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, accTex);
+    gl.uniform1i(U.d_u_acc, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, useGlow ? glowTexA : accTex);
+    gl.uniform1i(U.d_u_glowTex, 1);
+    gl.uniform1f(U.d_u_scale, accScale);
+    gl.uniform1f(U.d_u_glow, useGlow ? glow : 0);
+    gl.uniform1f(U.d_u_expo, expo);
+    gl.uniform1i(U.d_u_mode, mode);
+    gl.bindVertexArray(vaoQuad);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.activeTexture(gl.TEXTURE0);
+}
+
+// Три временные компоненты имитации люминофора: быстрая, средняя и медленная.
+// Пресеты художественные, а не паспортные кривые конкретных марок люминофора.
+// Сумма весов примерно постоянна, поэтому профили в первую очередь меняют форму хвоста.
+const PHOSPHOR_PROFILES = {
+    fast:     { fast: 1.08, mid: 0.06, slow: 0.00, midMul: 1.8, midAdd: 0.003, slowMul: 4.0,  slowAdd: 0.010 },
+    standard: { fast: 1.00, mid: 0.12, slow: 0.02, midMul: 2.5, midAdd: 0.006, slowMul: 8.0,  slowAdd: 0.025 },
+    dual:     { fast: 0.95, mid: 0.14, slow: 0.05, midMul: 4.0, midAdd: 0.010, slowMul: 14.0, slowAdd: 0.060 },
+    long:     { fast: 0.86, mid: 0.18, slow: 0.10, midMul: 6.0, midAdd: 0.015, slowMul: 22.0, slowAdd: 0.080 }
+};
+
+// Вынесено из цикла сегментов: не создаём новую функцию на каждой точке.
+function normalizedDirectionDot(ax, ay, bx, by) {
+    const al = Math.hypot(ax, ay), bl = Math.hypot(bx, by);
+    return al > 0.05 && bl > 0.05 ? Math.max(-1, Math.min(1, (ax * bx + ay * by) / (al * bl))) : 1;
+}
+
+function frameXY(dt) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, accFbo);
+    gl.viewport(0, 0, TW, TH);
+    gl.enable(gl.BLEND);
+    if (needClear) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); needClear = false; }
+
+    const phosphor = PHOSPHOR_PROFILES[phosphorSelect.value] || PHOSPHOR_PROFILES.standard;
+    const tauF = num(persistKnob) / 1000;
+    const tauM = tauF * phosphor.midMul + phosphor.midAdd;
+    const tauS = tauF * phosphor.slowMul + phosphor.slowAdd;
+    fadeAcc(Math.exp(-dt / tauF), Math.exp(-dt / tauM), Math.exp(-dt / tauS));
+
+    const n = fetchXY(dt);
+    const sigma = num(focusKnob);
+    const cx = W / 2, cy = H / 2, sc = Math.min(W, H) / 2 * 0.92 * num(voltKnob);
+    const Lt = 1.1 * num(brightKnob);                  // энергия электронного луча (beam current)
+
+    if (n > 0) {
+        if (!carryOK) { carryX.fill(sx[0]); carryY.fill(sy[0]); carryOK = true; }
+        const len = n + 3;
+        for (let i = 0; i < 3; i++) { QX[i] = cx + carryX[i] * sc; QY[i] = cy - carryY[i] * sc; }
+        for (let i = 0; i < n; i++) { QX[3 + i] = cx + sx[i] * sc; QY[3 + i] = cy - sy[i] * sc; }
+        // новая история: последние 3 точки (в нормированных координатах)
+        const c0 = len - 3;
+        for (let i = 0; i < 3; i++) {
+            const k = c0 + i;
+            carryX[i] = (QX[k] - cx) / sc; carryY[i] = (cy - QY[k]) / sc;
+        }
+        lastNX = carryX[2]; lastNY = carryY[2];
+
+        // RAW рисует только новые интервалы: им не нужен look-ahead и повторное
+        // наложение двух старых сегментов. Catmull требует историю и опережающую точку.
+        const firstSegment = smoothPath ? 1 : 2;
+        const lastSegment = smoothPath ? len - 3 : len - 2;
+
+        // Средняя длина шага для автояркости.
+        let sum = 0, cnt = 0;
+        for (let j = firstSegment; j <= lastSegment; j++) {
+            const dx = QX[j+1] - QX[j], dy = QY[j+1] - QY[j];
+            sum += Math.min(Math.sqrt(dx*dx + dy*dy), 30); cnt++;
+        }
+        if (cnt) {
+            const target = autoBright ? sum / cnt : 3;
+            LmeanS += (target - LmeanS) * (1 - Math.exp(-dt / 0.3));
+        }
+        const Eunit = Lt * sigma * SQ2PI * Math.min(Math.max(LmeanS, 0.3), 40);
+
+        for (let j = firstSegment; j <= lastSegment; j++) {
+            const x1 = QX[j], y1 = QY[j], x2 = QX[j+1], y2 = QY[j+1];
+            const dx = x2 - x1, dy = y2 - y1;
+            const L = Math.sqrt(dx*dx + dy*dy);
+            // Не обрезаем быстрые перемещения жёстким порогом: формула C = g·along/L
+            // сама уменьшает энергию на единицу длины для быстрого пролёта.
+            const stationary = L < 0.05 ? 0.03 : 1;     // «защита» от выжигания точки
+            // Z-axis blanking: отдельного Z-сигнала в стереофайле нет, поэтому
+            // переходы оцениваются по скорости и локальному нарушению направления.
+            // Большой сегмент на плавном участке получает меньше дополнительного
+            // штрафа, а скачок между разными частями фигуры — больше.
+            const speedRatio = L / Math.max(LmeanS, 0.3);
+            let dotSum = 0, dotCount = 0;
+            if (j > firstSegment) {
+                dotSum += normalizedDirectionDot(x1 - QX[j-1], y1 - QY[j-1], dx, dy);
+                dotCount++;
+            }
+            if (j < lastSegment) {
+                dotSum += normalizedDirectionDot(dx, dy, QX[j+2] - x2, QY[j+2] - y2);
+                dotCount++;
+            }
+            const meanDirection = dotCount ? dotSum / dotCount : 1;
+            const directionBreak = Math.max(0, Math.min(1, (0.35 - meanDirection) / 1.35));
+            const jumpScore = speedRatio * (1 + 0.35 * directionBreak);
+            const zStart = num(zThresholdKnob);
+            const zEnd = Math.max(5.0, zStart + 0.5);
+            const gateT = Math.max(0, Math.min(1, (jumpScore - zStart) / (zEnd - zStart)));
+            const gate = gateT * gateT * (3 - 2 * gateT); // smoothstep: без резкого щелчка яркости
+            const transitionGain = 1 - num(blankKnob) * gate;
+            let Us = 1, spline = false;
+            if (smoothPath && L > 4 && L < 60) {
+                const x0 = QX[j-1], y0 = QY[j-1], x3 = QX[j+2], y3 = QY[j+2];
+                const a = Math.abs(x1 - x0) + Math.abs(y1 - y0), b = Math.abs(x3 - x2) + Math.abs(y3 - y2);
+                if (a < 60 && b < 60) { spline = true; Us = Math.min(6, Math.ceil(L / 5)); }
+            }
+            const E = Eunit * stationary * transitionGain / Us;
+            if (!spline) {
+                const age = (len - 1 - (j + 0.5)) / sr;
+                addInst(x1, y1, x2, y2,
+                    E * phosphor.fast * Math.exp(-age / tauF),
+                    E * phosphor.mid * Math.exp(-age / tauM),
+                    E * phosphor.slow * Math.exp(-age / tauS));
+            } else {
+                const x0 = QX[j-1], y0 = QY[j-1], x3 = QX[j+2], y3 = QY[j+2];
+                let px = x1, py = y1;
+                for (let k = 1; k <= Us; k++) {
+                    const u = k / Us, u2 = u * u, u3 = u2 * u;
+                    const qx = 0.5 * (2*x1 + (-x0 + x2)*u + (2*x0 - 5*x1 + 4*x2 - x3)*u2 + (-x0 + 3*x1 - 3*x2 + x3)*u3);
+                    const qy = 0.5 * (2*y1 + (-y0 + y2)*u + (2*y0 - 5*y1 + 4*y2 - y3)*u2 + (-y0 + 3*y1 - 3*y2 + y3)*u3);
+                    const age = (len - 1 - (j + (k - 0.5) / Us)) / sr;
+                    addInst(px, py, qx, qy,
+                        E * phosphor.fast * Math.exp(-age / tauF),
+                        E * phosphor.mid * Math.exp(-age / tauM),
+                        E * phosphor.slow * Math.exp(-age / tauS));
+                    px = qx; py = qy;
+                }
+            }
+        }
+    } else if (!playing && !mic) {
+        // луч стоит на месте — яркая точка, равновесная яркость не зависит от FPS
+        const Edot = 2 * (2 * Math.PI * sigma * sigma) * (1 - Math.exp(-dt / tauF)) * Math.max(0.3, num(brightKnob));
+        const px = cx + lastNX * sc, py = cy - lastNY * sc;
+        addInst(px, py, px, py, Edot * phosphor.fast, Edot * phosphor.mid, Edot * phosphor.slow);
+    }
+    drawBeam(sigma);
+    present(0, num(glowKnob), 1.0);
+}
+
+function frameYT() {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, accFbo);
+    gl.viewport(0, 0, TW, TH);
+    gl.disable(gl.BLEND);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND);
+
+    let tw = parseInt(timeKnob.value, 10), winL = null, winR = null;
+    if (mic) {
+        tw = Math.min(tw, 2048);
+        anL.getFloatTimeDomainData(tmpL); anR.getFloatTimeDomainData(tmpR);
+        winL = tmpL.subarray(4096 - 2 * tw); winR = tmpR.subarray(4096 - 2 * tw);
+    } else if (buf) {
+        const end = Math.floor(posUnwrapped() * sr);
+        copyFile(end - 2 * tw, 2 * tw);
+        winL = sx; winR = sy;
+    }
+    const sigma = num(focusKnob);
+    const cy = H / 2, sc = (H / 2 - 10) * num(voltKnob);
+    const Lt = 1.3 * num(brightKnob);
+    const k = Lt * sigma * SQ2PI;
+
+    if (!winL) {
+        addInst(0, cy, W, cy, k * W, 0);                // нет сигнала — линия по центру
+    } else {
+        let start = 0;                                   // триггер: L пересекает ноль вверх
+        for (let i = 1; i < tw; i++) if (winL[i-1] < 0 && winL[i] >= 0) { start = i; break; }
+        const pts = Math.max(2, Math.min(tw, Math.floor(W * 1.5), 1600));
+        const step = tw / pts;
+        for (let ch = 0; ch < 2; ch++) {
+            const data = ch === 0 ? winL : winR;
+            let x0 = 0, y0 = cy - (data[start] || 0) * sc;
+            for (let i = 1; i < pts; i++) {
+                const v = data[start + Math.floor(i * step)] || 0;
+                const x = (i / (pts - 1)) * W, y = cy - v * sc;
+                const dx = x - x0, dy = y - y0, E = k * Math.max(Math.sqrt(dx*dx + dy*dy), 0.05);
+                addInst(x0, y0, x, y, ch === 0 ? E : 0, ch === 0 ? 0 : E);
+                x0 = x; y0 = y;
+            }
+        }
+    }
+    drawBeam(sigma);
+    present(1, num(glowKnob) * 0.6, 1.0);
+}
+
+// ───────────────────────── GPU timing (асинхронно, без readback-блокировок) ─────────────────────────
+const timerExt = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+const pendingGpuQueries = [];
+let gpuMs = null;
+function beginGpuTimer() {
+    if (!timerExt) return null;
+    const q = gl.createQuery();
+    if (!q) return null;
+    gl.beginQuery(timerExt.TIME_ELAPSED_EXT, q);
+    return q;
+}
+function endGpuTimer(q) {
+    if (!q || !timerExt) return;
+    gl.endQuery(timerExt.TIME_ELAPSED_EXT);
+    pendingGpuQueries.push(q);
+    if (pendingGpuQueries.length > 8) {
+        gl.deleteQuery(pendingGpuQueries.shift());
+    }
+}
+function pollGpuTimer() {
+    if (!timerExt) return;
+    const disjoint = gl.getParameter(timerExt.GPU_DISJOINT_EXT);
+    while (pendingGpuQueries.length) {
+        const q = pendingGpuQueries[0];
+        if (!gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) break;
+        pendingGpuQueries.shift();
+        if (!disjoint) gpuMs = gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6;
+        gl.deleteQuery(q);
+    }
+}
+
+// ───────────────────────── Главный цикл ─────────────────────────
+let lastT = performance.now(), lastUI = 0, fpsT = performance.now(), frames = 0;
+let cpuMs = 0;
+let lastDroppedInstances = 0;
+function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(Math.max((now - lastT) / 1000, 0.001), 0.1);
+    lastT = now;
+    updateClock();
+    if (!W || !glOK || !accTex) return;
+
+    const cpuStart = performance.now();
+    const gpuQuery = beginGpuTimer();
+    if (isXY) frameXY(dt); else frameYT();
+    endGpuTimer(gpuQuery);
+    cpuMs = performance.now() - cpuStart;
+    pollGpuTimer();
+
+    frames++;
+    if (now - fpsT > 500) {
+        const span = now - fpsT;
+        const droppedPerSec = Math.round((droppedInstances - lastDroppedInstances) * 1000 / span);
+        fpsEl.textContent = Math.round(frames * 1000 / span) + ' fps · ' + CW + '×' + CH
+            + ' · batch ' + peakBatchInstances + '/' + instanceCapacity
+            + ' · dropped ' + droppedPerSec + '/s'
+            + ' · CPU ' + cpuMs.toFixed(1) + ' ms'
+            + (gpuMs === null ? '' : ' · GPU ' + gpuMs.toFixed(1) + ' ms');
+        frames = 0;
+        fpsT = now;
+        lastDroppedInstances = droppedInstances;
+        peakBatchInstances = 0;
+    }
+    if (buf && now - lastUI > 200) {
+        lastUI = now;
+        if (!seeking) {
+            const p = wrap(posUnwrapped());
+            seekEl.value = Math.round(p / dur * 1000);
+            timeLabel.textContent = fmt(p) + ' / ' + fmt(dur);
+        }
+    }
+}
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && buf && playing) {
+        lastAbs = Math.floor(posUnwrapped() * sr); carryOK = false;
+        if (audioCtx.state !== 'running') audioCtx.resume();
+    }
+});
+
+try { glOK = initGL(); } catch (e) { statusEl.textContent = 'Ошибка WebGL: ' + e.message; console.error(e); }
+resize();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
