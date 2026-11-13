@@ -26,6 +26,7 @@ This is an independent recording of the composition being played through CRT Osc
 - **Gaussian glass glow:** separate downsample and blur passes, independent of the sharp beam image.
 - **Trajectory modes:** RAW and Catmull-Rom interpolation.
 - **Quality controls:** adjustable rendering quality for different devices.
+- **Bilingual interface:** English and Russian UI, with the selected language remembered in the browser.
 
 ## Getting started
 
@@ -42,13 +43,9 @@ The microphone input requires browser permission and a secure context (HTTPS or 
 
 The repository includes a GitHub Actions workflow for publishing the app as a public website.
 
-To enable the first deployment:
+The application is published from the `main` branch using GitHub Actions. The latest deployment completed successfully.
 
-1. Add the current application file as `index.html` in the repository root.
-2. Open **Settings → Pages**.
-3. Under **Build and deployment → Source**, select **GitHub Actions**.
-
-After the first successful deployment, the interactive app will be available at:
+Open the interactive app at:
 
 `https://ancientsus.github.io/CRT-Oscilloscope/`
 
@@ -58,6 +55,7 @@ The app is static and client-side: audio files selected in the page are decoded 
 
 | Control | Purpose |
 | --- | --- |
+| Language | Switch the interface between English (EN) and Russian (RU) |
 | File | Load an audio file from the device |
 | Microphone | Use live microphone input |
 | X-Y / Y-T | Switch display mode |
