@@ -12,6 +12,10 @@ The project renders audio-driven X-Y and Y-T traces using Web Audio API and WebG
 
 This is an independent recording of the composition being played through CRT Oscilloscope. It is not the original _Primer_ production video.
 
+## Explore the demoscene
+
+For inspiration and experimentation, take a look at the [Wild category on Pouët.net](https://www.pouet.net/prodlist.php?order=added&type%5B0%5D=wild). It collects unusual demoscene productions and experiments that do not fit neatly into the usual categories. Browse the entries, watch their videos, and use them as inspiration for your own audiovisual experiments.
+
 ## Features
 
 - **X-Y mode:** stereo left/right channels drive horizontal and vertical beam deflection.
