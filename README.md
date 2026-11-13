@@ -101,6 +101,6 @@ The video linked above is a separate recording made by the CRT Oscilloscope proj
 
 ## License
 
-A software license has not yet been selected for this repository. Until a license is added, do not assume permission to reuse, modify or redistribute this project's source code.
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for the full license text.
 
-The _Primer_ composition and its original visuals are not part of this project's source-code license and remain subject to their respective rights.
+The MIT License applies to the CRT Oscilloscope source code. It does not grant rights to third-party works featured in demonstrations, including _Primer_, its music, or its original visuals. Those remain the property of their respective rights holders.
