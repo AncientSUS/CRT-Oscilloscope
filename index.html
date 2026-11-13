@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -68,6 +68,8 @@
     .btn.small { font-size: 13px; padding: 10px 6px; }
     .btn.active { background: var(--amber); color: #111; border-color: var(--amber); }
     .btn:active { transform: scale(.97); }
+    .lang-row { justify-content: flex-end; }
+    .lang-btn { flex: 0 0 54px; min-width: 54px; padding: 7px 8px; font-size: 12px; }
     .knob { display: flex; flex-direction: column; gap: 2px; }
     .knob label { color: var(--amber); font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; }
     .knob label span { color: #9aa59a; font-weight: 400; }
@@ -96,82 +98,86 @@
             <canvas id="beam"></canvas>
             <canvas id="grid"></canvas>
             <div class="overlay">
-                <div class="ibtn" id="fsBtn" title="Во весь экран">⛶</div>
-                <div class="ibtn" id="panelBtn" title="Панель">☰</div>
+                <div class="ibtn" id="fsBtn" title="Fullscreen">⛶</div>
+                <div class="ibtn" id="panelBtn" title="Panel">☰</div>
             </div>
         </div>
         <div class="status" id="fps"></div>
-        <div class="status" id="status">Загрузите аудиофайл (лучше WAV/FLAC — без потерь)</div>
+        <div class="status" id="status">Load an audio file (WAV/FLAC recommended — lossless)</div>
     </div>
 
     <div class="panel" id="panel">
-        <div class="row">
-            <label class="btn" for="audioFile" id="fileLabel">🎵 Файл</label>
-            <input type="file" id="audioFile" accept="audio/*,.wav,.flac,.mp3,.ogg,.m4a" class="hidden">
-            <div class="btn" id="micBtn">🎙 Микрофон</div>
+        <div class="row lang-row" id="languageRow" role="group" aria-label="Interface language">
+            <button type="button" class="btn small lang-btn active" id="langEn" aria-pressed="true">EN</button>
+            <button type="button" class="btn small lang-btn" id="langRu" aria-pressed="false">RU</button>
         </div>
         <div class="row">
-            <div class="btn" id="playBtn">▶ Играть</div>
+            <label class="btn" for="audioFile" id="fileLabel" data-i18n="file">🎵 File</label>
+            <input type="file" id="audioFile" accept="audio/*,.wav,.flac,.mp3,.ogg,.m4a" class="hidden">
+            <div class="btn" id="micBtn">🎙 Microphone</div>
+        </div>
+        <div class="row">
+            <div class="btn" id="playBtn">▶ Play</div>
             <div class="btn active" id="modeBtn">MODE: X-Y</div>
         </div>
 
         <div class="knob">
-            <label>ПОЗИЦИЯ <span id="timeLabel">0:00 / 0:00</span></label>
+            <label data-i18n="position">POSITION <span id="timeLabel">0:00 / 0:00</span></label>
             <input type="range" id="seek" min="0" max="1000" step="1" value="0">
         </div>
         <div class="knob">
-            <label>ГРОМКОСТЬ</label>
+            <label data-i18n="volume">VOLUME</label>
             <input type="range" id="volKnob" min="0" max="1" step="0.01" value="0.8">
         </div>
         <div class="knob">
-            <label>СИНХРОНИЗАЦИЯ, мс <span id="syncVal"></span></label>
+            <label data-i18n="sync">SYNC, ms <span id="syncVal"></span></label>
             <input type="range" id="syncKnob" min="-300" max="600" step="5" value="0">
         </div>
         <div class="knob">
-            <label>МАСШТАБ (V/DIV) <span id="voltVal"></span></label>
+            <label data-i18n="scale">SCALE (V/DIV) <span id="voltVal"></span></label>
             <input type="range" id="voltKnob" min="0.1" max="3" step="0.05" value="1">
         </div>
         <div class="knob">
-            <label>ТОК ЛУЧА (BEAM CURRENT) <span id="brightVal"></span></label>
+            <label data-i18n="beamCurrent">BEAM CURRENT <span id="brightVal"></span></label>
             <input type="range" id="brightKnob" min="0.2" max="4" step="0.05" value="1">
         </div>
         <div class="knob">
-            <label>ФОКУС (толщина луча) <span id="focusVal"></span></label>
+            <label data-i18n="focus">FOCUS (beam width) <span id="focusVal"></span></label>
             <input type="range" id="focusKnob" min="0.3" max="2" step="0.05" value="0.6">
         </div>
         <div class="knob">
-            <label>ГАШЕНИЕ ЛУЧА (Z-AXIS) <span id="blankVal"></span></label>
+            <label data-i18n="blanking">BEAM BLANKING (Z-AXIS) <span id="blankVal"></span></label>
             <input type="range" id="blankKnob" min="0" max="1" step="0.05" value="0.95">
         </div>
         <div class="knob">
-            <label>ПОРОГ ОБНАРУЖЕНИЯ ПЕРЕХОДА <span id="zThresholdVal"></span></label>
+            <label data-i18n="threshold">TRANSITION DETECTION THRESHOLD <span id="zThresholdVal"></span></label>
             <input type="range" id="zThresholdKnob" min="1.5" max="4.5" step="0.1" value="2.2">
         </div>
         <div class="knob">
-            <label>ПОСЛЕСВЕЧЕНИЕ, мс <span id="persistVal"></span></label>
+            <label data-i18n="persistence">PHOSPHOR PERSISTENCE, ms <span id="persistVal"></span></label>
             <input type="range" id="persistKnob" min="1" max="150" step="1" value="10">
         </div>
         <div class="knob">
-            <label>ПРОФИЛЬ ЛЮМИНОФОРА (X-Y) <span id="phosphorVal">Стандартный</span></label>
+            <label data-i18n="phosphorProfile">PHOSPHOR PROFILE (X-Y) <span id="phosphorVal">Standard</span></label>
             <select id="phosphorSelect">
-                <option value="fast">Быстрый — короткий след</option>
-                <option value="standard" selected>Стандартный — сбалансированный</option>
-                <option value="dual">Двойной — выраженный хвост</option>
-                <option value="long">Длинный — длительное послесвечение</option>
+                <option value="fast" data-i18n="phosphorFast">Fast — short trail</option>
+                <option value="standard" selected data-i18n="phosphorStandard">Standard — balanced</option>
+                <option value="dual" data-i18n="phosphorDual">Dual — pronounced tail</option>
+                <option value="long" data-i18n="phosphorLong">Long — extended persistence</option>
             </select>
         </div>
         <div class="knob">
-            <label>СВЕЧЕНИЕ СТЕКЛА (GAUSSIAN) <span id="glowVal"></span></label>
+            <label data-i18n="glow">GLASS GLOW (GAUSSIAN) <span id="glowVal"></span></label>
             <input type="range" id="glowKnob" min="0" max="1.5" step="0.05" value="0.45">
         </div>
         <div class="knob" id="timeGroup">
-            <label>TIME/DIV (окно Y-T, сэмплов) <span id="timeVal"></span></label>
+            <label data-i18n="timeDiv">TIME/DIV (Y-T window, samples) <span id="timeVal"></span></label>
             <input type="range" id="timeKnob" min="256" max="8192" step="256" value="2048">
         </div>
         <div class="row">
-            <div class="btn small active" id="autoBtn">АВТО-ЯРКОСТЬ</div>
-            <div class="btn small active" id="qualBtn">КАЧЕСТВО: ВЫСОКОЕ</div>
-            <div class="btn small" id="curveBtn">ТРАЕКТОРИЯ: RAW</div>
+            <div class="btn small active" id="autoBtn">AUTO BRIGHTNESS</div>
+            <div class="btn small active" id="qualBtn">QUALITY: HIGH</div>
+            <div class="btn small" id="curveBtn">TRACE: RAW</div>
         </div>
     </div>
 </div>
@@ -193,9 +199,129 @@ const zThresholdKnob = $('zThresholdKnob'), phosphorSelect = $('phosphorSelect')
 const persistKnob = $('persistKnob'), glowKnob = $('glowKnob'), timeKnob = $('timeKnob');
 const syncKnob = $('syncKnob');
 const timeGroup = $('timeGroup'), autoBtn = $('autoBtn'), qualBtn = $('qualBtn'), curveBtn = $('curveBtn');
+const langEnBtn = $('langEn'), langRuBtn = $('langRu'), languageRow = $('languageRow');
 
 let isXY = true, autoBright = true, hiQuality = true, smoothPath = false;
 const num = el => parseFloat(el.value);
+
+const I18N = {
+    en: {
+        documentTitle: 'CRT Oscilloscope', language: 'Interface language',
+        fullscreen: 'Fullscreen', panel: 'Panel',
+        file: '🎵 File', mic: '🎙 Microphone', stop: '🛑 Stop', play: '▶ Play', pause: '⏸ Pause',
+        position: 'POSITION', volume: 'VOLUME', sync: 'SYNC, ms', scale: 'SCALE (V/DIV)',
+        beamCurrent: 'BEAM CURRENT', focus: 'FOCUS (beam width)', blanking: 'BEAM BLANKING (Z-AXIS)',
+        threshold: 'TRANSITION DETECTION THRESHOLD', persistence: 'PHOSPHOR PERSISTENCE, ms',
+        phosphorProfile: 'PHOSPHOR PROFILE (X-Y)', phosphorFast: 'Fast — short trail',
+        phosphorStandard: 'Standard — balanced', phosphorDual: 'Dual — pronounced tail',
+        phosphorLong: 'Long — extended persistence', glow: 'GLASS GLOW (GAUSSIAN)',
+        timeDiv: 'TIME/DIV (Y-T window, samples)', autoBrightness: 'AUTO BRIGHTNESS',
+        mode: xy => 'MODE: ' + (xy ? 'X-Y' : 'Y-T'),
+        quality: high => 'QUALITY: ' + (high ? 'HIGH' : 'LOW'),
+        curve: smooth => 'TRACE: ' + (smooth ? 'CATMULL' : 'RAW'),
+        phosphorNames: { fast: 'Fast', standard: 'Standard', dual: 'Dual', long: 'Long' },
+        batch: 'batch', dropped: 'dropped', cpu: 'CPU', gpu: 'GPU',
+        status: {
+            prompt: 'Load an audio file (WAV/FLAC recommended — lossless)',
+            analyzing: 'Analyzing format and decoding…',
+            loaded: p => {
+                const rate = p.sourceRate
+                    ? ' · source ' + p.sourceRate + ' Hz · analysis ' + p.sampleRate + ' Hz' + (p.resampled ? ' (resampled by browser)' : ' (no resampling)')
+                    : ' · analysis ' + p.sampleRate + ' Hz (source rate unknown)';
+                return p.fileName + rate + ' · output: audio-system resampling · ' + (p.stereo ? 'Stereo' : 'Mono (X = Y, diagonal trace)');
+            },
+            readError: 'Could not read the file',
+            startError: 'Could not start the audio engine',
+            microphone: 'Microphone',
+            webgl: p => 'WebGL error: ' + p.message,
+            hdr: 'HDR textures unavailable; using simplified 8-bit mode',
+            glowFallback: 'Glow FBO unavailable; using sharp rendering without a halo'
+        },
+        readAlert: 'File read error. Try WAV, FLAC, or MP3.',
+        micAlert: 'Microphone access denied or unavailable.'
+    },
+    ru: {
+        documentTitle: 'CRT Oscilloscope', language: 'Язык интерфейса',
+        fullscreen: 'Во весь экран', panel: 'Панель',
+        file: '🎵 Файл', mic: '🎙 Микрофон', stop: '🛑 Стоп', play: '▶ Играть', pause: '⏸ Пауза',
+        position: 'ПОЗИЦИЯ', volume: 'ГРОМКОСТЬ', sync: 'СИНХРОНИЗАЦИЯ, мс',
+        scale: 'МАСШТАБ (V/DIV)', beamCurrent: 'ТОК ЛУЧА (BEAM CURRENT)',
+        focus: 'ФОКУС (толщина луча)', blanking: 'ГАШЕНИЕ ЛУЧА (Z-AXIS)',
+        threshold: 'ПОРОГ ОБНАРУЖЕНИЯ ПЕРЕХОДА', persistence: 'ПОСЛЕСВЕЧЕНИЕ, мс',
+        phosphorProfile: 'ПРОФИЛЬ ЛЮМИНОФОРА (X-Y)', phosphorFast: 'Быстрый — короткий след',
+        phosphorStandard: 'Стандартный — сбалансированный', phosphorDual: 'Двойной — выраженный хвост',
+        phosphorLong: 'Длинный — длительное послесвечение', glow: 'СВЕЧЕНИЕ СТЕКЛА (GAUSSIAN)',
+        timeDiv: 'TIME/DIV (окно Y-T, сэмплов)', autoBrightness: 'АВТО-ЯРКОСТЬ',
+        mode: xy => 'РЕЖИМ: ' + (xy ? 'X-Y' : 'Y-T'),
+        quality: high => 'КАЧЕСТВО: ' + (high ? 'ВЫСОКОЕ' : 'НИЗКОЕ'),
+        curve: smooth => 'ТРАЕКТОРИЯ: ' + (smooth ? 'CATMULL' : 'RAW'),
+        phosphorNames: { fast: 'Быстрый', standard: 'Стандартный', dual: 'Двойной', long: 'Длинный' },
+        batch: 'пакет', dropped: 'потеряно', cpu: 'CPU', gpu: 'GPU',
+        status: {
+            prompt: 'Загрузите аудиофайл (лучше WAV/FLAC — без потерь)',
+            analyzing: 'Анализирую формат и декодирую…',
+            loaded: p => {
+                const rate = p.sourceRate
+                    ? ' · источник ' + p.sourceRate + ' Гц · анализ ' + p.sampleRate + ' Гц' + (p.resampled ? ' (пересчитан браузером)' : ' (без пересчёта)')
+                    : ' · анализ ' + p.sampleRate + ' Гц (частота источника не определена)';
+                return p.fileName + rate + ' · выход: ресемплинг аудиосистемой · ' + (p.stereo ? 'стерео' : 'моно (X = Y, будет диагональ)');
+            },
+            readError: 'Не удалось прочитать файл',
+            startError: 'Не удалось запустить аудиодвижок',
+            microphone: 'Микрофон',
+            webgl: p => 'Ошибка WebGL: ' + p.message,
+            hdr: 'HDR-текстуры недоступны, упрощённый режим (8 бит)',
+            glowFallback: 'Glow FBO недоступен: используется резкий режим без ореола'
+        },
+        readAlert: 'Ошибка чтения. Попробуйте WAV, FLAC или MP3.',
+        micAlert: 'Нет доступа к микрофону.'
+    }
+};
+
+let language = (() => {
+    try { return localStorage.getItem('scopeLanguage') === 'ru' ? 'ru' : 'en'; }
+    catch (_) { return 'en'; }
+})();
+let statusKey = 'prompt', statusArgs = {};
+const tr = (key, ...args) => {
+    const value = I18N[language][key];
+    return typeof value === 'function' ? value(...args) : value;
+};
+function setStatus(key, args = {}) {
+    statusKey = key; statusArgs = args;
+    const value = I18N[language].status[key];
+    statusEl.textContent = typeof value === 'function' ? value(args) : value;
+}
+function updatePhosphorName() {
+    $('phosphorVal').textContent = I18N[language].phosphorNames[phosphorSelect.value] || I18N[language].phosphorNames.standard;
+}
+function applyLanguage() {
+    document.documentElement.lang = language;
+    document.title = tr('documentTitle');
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const value = tr(el.getAttribute('data-i18n'));
+        const textNode = Array.from(el.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
+        if (textNode) textNode.nodeValue = value + (el.tagName === 'LABEL' && el.querySelector('span') ? ' ' : '');
+    });
+    $('fsBtn').title = tr('fullscreen');
+    $('panelBtn').title = tr('panel');
+    languageRow.setAttribute('aria-label', tr('language'));
+    langEnBtn.classList.toggle('active', language === 'en');
+    langRuBtn.classList.toggle('active', language === 'ru');
+    langEnBtn.setAttribute('aria-pressed', String(language === 'en'));
+    langRuBtn.setAttribute('aria-pressed', String(language === 'ru'));
+    setStatus(statusKey, statusArgs);
+    setPlayUI(); setMicUI(); setModeUI(); setAutoUI(); setQualityUI(); setCurveUI(); updatePhosphorName();
+}
+function setLanguage(next) {
+    if (!I18N[next] || next === language) return;
+    language = next;
+    try { localStorage.setItem('scopeLanguage', language); } catch (_) {}
+    applyLanguage();
+}
+langEnBtn.addEventListener('click', () => setLanguage('en'));
+langRuBtn.addEventListener('click', () => setLanguage('ru'));
+
 
 // ───────────────────────── Аудио ─────────────────────────
 let audioCtx = null, gainNode = null, splitter = null, anL = null, anR = null;
@@ -363,7 +489,7 @@ fileInput.addEventListener('change', async (e) => {
     try {
         stopMic(); stopSrc(); playing = false; setPlayUI();
         buf = null; chL = null; chR = null;
-        statusEl.textContent = 'Анализирую формат и декодирую…';
+        setStatus('analyzing');
         const encoded = await file.arrayBuffer();
         if (loadSerial !== fileLoadSerial) return;
         detectedSourceRate = detectSourceSampleRate(encoded);
@@ -378,16 +504,13 @@ fileInput.addEventListener('change', async (e) => {
         resizeSampleBuffers(sr);
         pausedOff = 0; lastAbs = 0; carryOK = false; lastNX = 0; lastNY = 0;
         seekEl.value = 0; timeLabel.textContent = '0:00 / ' + fmt(dur);
-        const rateInfo = detectedSourceRate
-            ? ` · источник ${detectedSourceRate} Гц · анализ ${sr} Гц${sr === detectedSourceRate ? ' (без пересчёта)' : ' (пересчитан браузером)'}`
-            : ` · анализ ${sr} Гц (частота источника не определена)`;
-        statusEl.textContent = `${fileName}${rateInfo} · выход: ресемплинг аудиосистемой · ` + (buf.numberOfChannels > 1 ? 'стерео' : 'моно (X = Y, будет диагональ)');
+        setStatus('loaded', { fileName, sourceRate: detectedSourceRate, sampleRate: sr, resampled: sr !== detectedSourceRate, stereo: buf.numberOfChannels > 1 });
     } catch (err) {
         if (loadSerial !== fileLoadSerial) return;
         buf = null; chL = null; chR = null;
-        statusEl.textContent = 'Не удалось прочитать файл';
+        setStatus('readError');
         console.error('Audio decode/configuration failed:', err);
-        alert('Ошибка чтения. Попробуйте WAV, FLAC или MP3.');
+        alert(tr('readAlert'));
     } finally {
         if (loadSerial === fileLoadSerial) fileInput.value = '';
     }
@@ -405,15 +528,19 @@ function startSrc() {
 }
 async function play() {
     try { await resumeCtx(); startSrc(); playing = true; setPlayUI(); }
-    catch (err) { statusEl.textContent = 'Не удалось запустить аудиодвижок'; console.error(err); }
+    catch (err) { setStatus('startError'); console.error(err); }
 }
 function pause() {
     pausedOff = wrap(posUnwrapped() + syncSec()); stopSrc(); playing = false;   // позиция именно звука
     lastAbs = Math.floor(pausedOff * sr); setPlayUI();
 }
 function setPlayUI() {
-    playBtn.textContent = playing ? '⏸ Пауза' : '▶ Играть';
+    playBtn.textContent = tr(playing ? 'pause' : 'play');
     playBtn.classList.toggle('active', playing);
+}
+function setMicUI() {
+    micBtn.textContent = tr(mic ? 'stop' : 'mic');
+    micBtn.classList.toggle('active', mic);
 }
 playBtn.addEventListener('click', () => { if (!buf || mic) return; if (playing) pause(); else play(); });
 
@@ -433,15 +560,15 @@ micBtn.addEventListener('click', async () => {
         micSrc = audioCtx.createMediaStreamSource(micStream);
         micSrc.connect(splitter);
         sr = audioCtx.sampleRate; mic = true; carryOK = false;
-        micBtn.classList.add('active'); micBtn.textContent = '🛑 Стоп';
-        statusEl.textContent = 'Микрофон';
-    } catch (err) { alert('Нет доступа к микрофону.'); }
+        setMicUI();
+        setStatus('microphone');
+    } catch (err) { alert(tr('micAlert')); }
 });
 function stopMic() {
     if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
     if (micSrc) { micSrc.disconnect(); micSrc = null; }
     mic = false; carryOK = false;
-    micBtn.classList.remove('active'); micBtn.textContent = '🎙 Микрофон';
+    setMicUI();
 }
 volKnob.addEventListener('input', () => { if (gainNode) gainNode.gain.value = num(volKnob); });
 try { const v = localStorage.getItem('scopeSyncMs'); if (v !== null) syncKnob.value = v; } catch (_) {}
@@ -459,30 +586,30 @@ for (const [knob, out] of [[syncKnob,'syncVal'],[voltKnob,'voltVal'],[brightKnob
     const f = () => { $(out).textContent = fmtVal[out](knob.value); };
     knob.addEventListener('input', f); f();
 }
-const phosphorNames = { fast: 'Быстрый', standard: 'Стандартный', dual: 'Двойной', long: 'Длинный' };
-phosphorSelect.addEventListener('change', () => { $('phosphorVal').textContent = phosphorNames[phosphorSelect.value] || 'Стандартный'; });
+phosphorSelect.addEventListener('change', updatePhosphorName);
 
 // ───────────────────────── Макет и кнопки ─────────────────────────
+function setModeUI() { modeBtn.textContent = tr('mode', isXY); modeBtn.classList.toggle('active', isXY); }
+function setAutoUI() { autoBtn.textContent = tr('autoBrightness'); autoBtn.classList.toggle('active', autoBright); }
+function setQualityUI() { qualBtn.textContent = tr('quality', hiQuality); qualBtn.classList.toggle('active', hiQuality); }
+function setCurveUI() { curveBtn.textContent = tr('curve', smoothPath); curveBtn.classList.toggle('active', smoothPath); }
 function setMode(xy) {
     isXY = xy;
-    modeBtn.textContent = isXY ? 'MODE: X-Y' : 'MODE: Y-T';
-    modeBtn.classList.toggle('active', isXY);
+    setModeUI();
     screenEl.classList.toggle('yt', !isXY);
     timeGroup.classList.toggle('hidden', isXY);
     carryOK = false; needClear = true;
 }
 modeBtn.addEventListener('click', () => setMode(!isXY));
-autoBtn.addEventListener('click', () => { autoBright = !autoBright; autoBtn.classList.toggle('active', autoBright); });
+autoBtn.addEventListener('click', () => { autoBright = !autoBright; setAutoUI(); });
 qualBtn.addEventListener('click', () => {
     hiQuality = !hiQuality;
-    qualBtn.classList.toggle('active', hiQuality);
-    qualBtn.textContent = 'КАЧЕСТВО: ' + (hiQuality ? 'ВЫСОКОЕ' : 'НИЗКОЕ');
+    setQualityUI();
     resize();
 });
 curveBtn.addEventListener('click', () => {
     smoothPath = !smoothPath;
-    curveBtn.classList.toggle('active', smoothPath);
-    curveBtn.textContent = 'ТРАЕКТОРИЯ: ' + (smoothPath ? 'CATMULL' : 'RAW');
+    setCurveUI();
     carryOK = false; needClear = true;
 });
 $('panelBtn').addEventListener('click', () => appEl.classList.toggle('nopanel'));
@@ -492,6 +619,7 @@ $('fsBtn').addEventListener('click', () => {
     else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
 });
 timeGroup.classList.add('hidden');
+applyLanguage();
 
 // ───────────────────────── Размер, сетка ─────────────────────────
 let W = 0, H = 0, CW = 0, CH = 0, needClear = true;
@@ -771,7 +899,7 @@ function allocAcc(w, h) {
     gl.viewport(0, 0, w, h);
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    if (!floatOK) statusEl.textContent = 'HDR-текстуры недоступны, упрощённый режим (8 бит)';
+    if (!floatOK) setStatus('hdr');
     allocGlow(Math.max(1, Math.ceil(w / 2)), Math.max(1, Math.ceil(h / 2)));
 }
 
@@ -806,7 +934,7 @@ function allocGlow(w, h) {
     } else {
         if (a) { gl.deleteTexture(a.tex); gl.deleteFramebuffer(a.fbo); }
         if (b) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo); }
-        statusEl.textContent = 'Glow FBO недоступен: используется резкий режим без ореола';
+        setStatus('glowFallback');
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
@@ -1158,10 +1286,10 @@ function frame(now) {
         const span = now - fpsT;
         const droppedPerSec = Math.round((droppedInstances - lastDroppedInstances) * 1000 / span);
         fpsEl.textContent = Math.round(frames * 1000 / span) + ' fps · ' + CW + '×' + CH
-            + ' · batch ' + peakBatchInstances + '/' + instanceCapacity
-            + ' · dropped ' + droppedPerSec + '/s'
-            + ' · CPU ' + cpuMs.toFixed(1) + ' ms'
-            + (gpuMs === null ? '' : ' · GPU ' + gpuMs.toFixed(1) + ' ms');
+            + ' · ' + tr('batch') + ' ' + peakBatchInstances + '/' + instanceCapacity
+            + ' · ' + tr('dropped') + ' ' + droppedPerSec + '/s'
+            + ' · ' + tr('cpu') + ' ' + cpuMs.toFixed(1) + ' ms'
+            + (gpuMs === null ? '' : ' · ' + tr('gpu') + ' ' + gpuMs.toFixed(1) + ' ms');
         frames = 0;
         fpsT = now;
         lastDroppedInstances = droppedInstances;
@@ -1183,7 +1311,7 @@ document.addEventListener('visibilitychange', () => {
     }
 });
 
-try { glOK = initGL(); } catch (e) { statusEl.textContent = 'Ошибка WebGL: ' + e.message; console.error(e); }
+try { glOK = initGL(); } catch (e) { setStatus('webgl', { message: e.message }); console.error(e); }
 resize();
 requestAnimationFrame(frame);
 })();
