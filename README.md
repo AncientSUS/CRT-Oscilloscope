@@ -38,6 +38,22 @@ No installation, build step, package manager or external runtime is required.
 
 The microphone input requires browser permission and a secure context (HTTPS or localhost). Audio decoding depends on the codecs supported by the browser.
 
+## Public web version (GitHub Pages)
+
+The repository includes a GitHub Actions workflow for publishing the app as a public website.
+
+To enable the first deployment:
+
+1. Add the current application file as `index.html` in the repository root.
+2. Open **Settings → Pages**.
+3. Under **Build and deployment → Source**, select **GitHub Actions**.
+
+After the first successful deployment, the interactive app will be available at:
+
+`https://ancientsus.github.io/CRT-Oscilloscope/`
+
+The app is static and client-side: audio files selected in the page are decoded locally in the visitor's browser; they are not uploaded to a project server. Microphone input also stays in the browser and requires explicit permission.
+
 ## Controls
 
 | Control | Purpose |
