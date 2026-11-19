@@ -81,6 +81,17 @@
     }
     .hidden { display: none !important; }
     .app.nopanel .panel { display: none; }
+    .volume-warning {
+        position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom));
+        z-index: 20; width: min(calc(100% - 28px), 440px);
+        padding: 11px 14px; border: 1px solid rgba(255,204,102,.55); border-radius: 8px;
+        background: rgba(24,27,24,.96); color: var(--amber);
+        font-size: 13px; line-height: 1.4; text-align: center;
+        box-shadow: 0 8px 28px rgba(0,0,0,.45);
+        opacity: 0; transform: translate(-50%, 10px); pointer-events: none;
+        transition: opacity .18s ease, transform .18s ease;
+    }
+    .volume-warning.visible { opacity: 1; transform: translate(-50%, 0); }
 
     @media (orientation: portrait) { .screen { --hb: 66dvh; } .app.nopanel .screen { --hb: 90dvh; } }
     @media (orientation: landscape) {
@@ -181,6 +192,7 @@
         </div>
     </div>
 </div>
+<div id="volumeWarning" class="volume-warning" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 (() => {
@@ -194,6 +206,7 @@ const statusEl = $('status'), fpsEl = $('fps');
 const fileInput = $('audioFile'), fileLabel = $('fileLabel');
 const micBtn = $('micBtn'), playBtn = $('playBtn'), modeBtn = $('modeBtn');
 const seekEl = $('seek'), timeLabel = $('timeLabel'), volKnob = $('volKnob');
+const volumeWarningEl = $('volumeWarning');
 const voltKnob = $('voltKnob'), brightKnob = $('brightKnob'), focusKnob = $('focusKnob'), blankKnob = $('blankKnob');
 const zThresholdKnob = $('zThresholdKnob'), phosphorSelect = $('phosphorSelect');
 const persistKnob = $('persistKnob'), glowKnob = $('glowKnob'), timeKnob = $('timeKnob');
@@ -202,6 +215,7 @@ const timeGroup = $('timeGroup'), autoBtn = $('autoBtn'), qualBtn = $('qualBtn')
 const langEnBtn = $('langEn'), langRuBtn = $('langRu'), languageRow = $('languageRow');
 
 let isXY = true, autoBright = true, hiQuality = true, smoothPath = false;
+let volumeWarningTimer = null;
 const num = el => parseFloat(el.value);
 
 const I18N = {
@@ -209,7 +223,7 @@ const I18N = {
         documentTitle: 'CRT Oscilloscope', language: 'Interface language',
         fullscreen: 'Fullscreen', panel: 'Panel',
         file: '🎵 File', mic: '🎙 Microphone', stop: '🛑 Stop', play: '▶ Play', pause: '⏸ Pause',
-        position: 'POSITION', volume: 'VOLUME', sync: 'SYNC, ms', scale: 'SCALE (V/DIV)',
+        position: 'POSITION', volume: 'VOLUME', volumeWarning: 'Volume is above 80% — high listening levels may damage hearing.', sync: 'SYNC, ms', scale: 'SCALE (V/DIV)',
         beamCurrent: 'BEAM CURRENT', focus: 'FOCUS (beam width)', blanking: 'BEAM BLANKING (Z-AXIS)',
         threshold: 'TRANSITION DETECTION THRESHOLD', persistence: 'PHOSPHOR PERSISTENCE, ms',
         phosphorProfile: 'PHOSPHOR PROFILE (X-Y)', phosphorFast: 'Fast — short trail',
@@ -244,7 +258,7 @@ const I18N = {
         documentTitle: 'CRT Oscilloscope', language: 'Язык интерфейса',
         fullscreen: 'Во весь экран', panel: 'Панель',
         file: '🎵 Файл', mic: '🎙 Микрофон', stop: '🛑 Стоп', play: '▶ Играть', pause: '⏸ Пауза',
-        position: 'ПОЗИЦИЯ', volume: 'ГРОМКОСТЬ', sync: 'СИНХРОНИЗАЦИЯ, мс',
+        position: 'ПОЗИЦИЯ', volume: 'ГРОМКОСТЬ', volumeWarning: 'Громкость выше 80% — высокий уровень звука может повредить слух.', sync: 'СИНХРОНИЗАЦИЯ, мс',
         scale: 'МАСШТАБ (V/DIV)', beamCurrent: 'ТОК ЛУЧА (BEAM CURRENT)',
         focus: 'ФОКУС (толщина луча)', blanking: 'ГАШЕНИЕ ЛУЧА (Z-AXIS)',
         threshold: 'ПОРОГ ОБНАРУЖЕНИЯ ПЕРЕХОДА', persistence: 'ПОСЛЕСВЕЧЕНИЕ, мс',
@@ -287,6 +301,17 @@ const tr = (key, ...args) => {
     const value = I18N[language][key];
     return typeof value === 'function' ? value(...args) : value;
 };
+function updateVolumeWarning() {
+    if (num(volKnob) <= 0.8) {
+        clearTimeout(volumeWarningTimer);
+        volumeWarningEl.classList.remove('visible');
+        return;
+    }
+    volumeWarningEl.textContent = tr('volumeWarning');
+    volumeWarningEl.classList.add('visible');
+    clearTimeout(volumeWarningTimer);
+    volumeWarningTimer = setTimeout(() => volumeWarningEl.classList.remove('visible'), 2200);
+}
 function setStatus(key, args = {}) {
     statusKey = key; statusArgs = args;
     const value = I18N[language].status[key];
@@ -311,6 +336,7 @@ function applyLanguage() {
     langEnBtn.setAttribute('aria-pressed', String(language === 'en'));
     langRuBtn.setAttribute('aria-pressed', String(language === 'ru'));
     setStatus(statusKey, statusArgs);
+    if (volumeWarningEl.classList.contains('visible')) volumeWarningEl.textContent = tr('volumeWarning');
     setPlayUI(); setMicUI(); setModeUI(); setAutoUI(); setQualityUI(); setCurveUI(); updatePhosphorName();
 }
 function setLanguage(next) {
@@ -570,7 +596,10 @@ function stopMic() {
     mic = false; carryOK = false;
     setMicUI();
 }
-volKnob.addEventListener('input', () => { if (gainNode) gainNode.gain.value = num(volKnob); });
+volKnob.addEventListener('input', () => {
+    if (gainNode) gainNode.gain.value = num(volKnob);
+    updateVolumeWarning();
+});
 try { const v = localStorage.getItem('scopeSyncMs'); if (v !== null) syncKnob.value = v; } catch (_) {}
 syncKnob.addEventListener('input', () => {
     try { localStorage.setItem('scopeSyncMs', syncKnob.value); } catch (_) {}
