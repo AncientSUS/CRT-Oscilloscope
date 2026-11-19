@@ -216,6 +216,7 @@ const langEnBtn = $('langEn'), langRuBtn = $('langRu'), languageRow = $('languag
 
 let isXY = true, autoBright = true, hiQuality = true, smoothPath = false;
 let volumeWarningTimer = null;
+let volumeWasAboveLimit = num(volKnob) > 0.8;
 const num = el => parseFloat(el.value);
 
 const I18N = {
@@ -302,11 +303,17 @@ const tr = (key, ...args) => {
     return typeof value === 'function' ? value(...args) : value;
 };
 function updateVolumeWarning() {
-    if (num(volKnob) <= 0.8) {
+    const aboveLimit = num(volKnob) > 0.8;
+    if (!aboveLimit) {
+        volumeWasAboveLimit = false;
         clearTimeout(volumeWarningTimer);
         volumeWarningEl.classList.remove('visible');
         return;
     }
+    // Показываем только при пересечении порога снизу вверх.
+    // Движение внутри зоны >80% не перезапускает уведомление.
+    if (volumeWasAboveLimit) return;
+    volumeWasAboveLimit = true;
     volumeWarningEl.textContent = tr('volumeWarning');
     volumeWarningEl.classList.add('visible');
     clearTimeout(volumeWarningTimer);
