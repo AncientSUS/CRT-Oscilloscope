@@ -92,6 +92,18 @@
         transition: opacity .18s ease, transform .18s ease;
     }
     .volume-warning.visible { opacity: 1; transform: translate(-50%, 0); }
+    .ui-tooltip {
+        position: fixed; z-index: 30; max-width: min(280px, calc(100vw - 24px));
+        width: max-content; padding: 9px 11px;
+        border: 1px solid rgba(120,200,130,.35); border-radius: 7px;
+        background: rgba(18,22,18,.97); color: #dfe6df;
+        font-size: 12px; line-height: 1.45; font-weight: 400;
+        text-align: left; white-space: normal; overflow-wrap: anywhere;
+        box-shadow: 0 7px 24px rgba(0,0,0,.48);
+        pointer-events: none; opacity: 0; visibility: hidden;
+        transform: translateY(3px); transition: opacity .12s ease, transform .12s ease;
+    }
+    .ui-tooltip.visible { opacity: 1; visibility: visible; transform: translateY(0); }
 
     @media (orientation: portrait) { .screen { --hb: 66dvh; } .app.nopanel .screen { --hb: 90dvh; } }
     @media (orientation: landscape) {
@@ -109,8 +121,8 @@
             <canvas id="beam"></canvas>
             <canvas id="grid"></canvas>
             <div class="overlay">
-                <div class="ibtn" id="fsBtn" title="Fullscreen">⛶</div>
-                <div class="ibtn" id="panelBtn" title="Panel">☰</div>
+                <div class="ibtn" id="fsBtn" data-tip="fullscreen" aria-label="Fullscreen">⛶</div>
+                <div class="ibtn" id="panelBtn" data-tip="panel" aria-label="Panel">☰</div>
             </div>
         </div>
         <div class="status" id="fps"></div>
@@ -119,58 +131,58 @@
 
     <div class="panel" id="panel">
         <div class="row lang-row" id="languageRow" role="group" aria-label="Interface language">
-            <button type="button" class="btn small lang-btn active" id="langEn" aria-pressed="true">EN</button>
-            <button type="button" class="btn small lang-btn" id="langRu" aria-pressed="false">RU</button>
+            <button type="button" class="btn small lang-btn active" id="langEn" data-tip="langEn" aria-pressed="true">EN</button>
+            <button type="button" class="btn small lang-btn" id="langRu" data-tip="langRu" aria-pressed="false">RU</button>
         </div>
         <div class="row">
-            <label class="btn" for="audioFile" id="fileLabel" data-i18n="file">🎵 File</label>
+            <label class="btn" for="audioFile" id="fileLabel" data-i18n="file" data-tip="file">🎵 File</label>
             <input type="file" id="audioFile" accept="audio/*,.wav,.flac,.mp3,.ogg,.m4a" class="hidden">
-            <div class="btn" id="micBtn">🎙 Microphone</div>
+            <div class="btn" id="micBtn" data-tip="microphone">🎙 Microphone</div>
         </div>
         <div class="row">
-            <div class="btn" id="playBtn">▶ Play</div>
-            <div class="btn active" id="modeBtn">MODE: X-Y</div>
+            <div class="btn" id="playBtn" data-tip="play">▶ Play</div>
+            <div class="btn active" id="modeBtn" data-tip="mode">MODE: X-Y</div>
         </div>
 
         <div class="knob">
             <label data-i18n="position">POSITION <span id="timeLabel">0:00 / 0:00</span></label>
-            <input type="range" id="seek" min="0" max="1000" step="1" value="0">
+            <input type="range" id="seek" data-tip="position" min="0" max="1000" step="1" value="0">
         </div>
         <div class="knob">
             <label data-i18n="volume">VOLUME</label>
-            <input type="range" id="volKnob" min="0" max="1" step="0.01" value="0.8">
+            <input type="range" id="volKnob" data-tip="volume" min="0" max="1" step="0.01" value="0.8">
         </div>
         <div class="knob">
             <label data-i18n="sync">SYNC, ms <span id="syncVal"></span></label>
-            <input type="range" id="syncKnob" min="-300" max="600" step="5" value="0">
+            <input type="range" id="syncKnob" data-tip="sync" min="-300" max="600" step="5" value="0">
         </div>
         <div class="knob">
             <label data-i18n="scale">SCALE (V/DIV) <span id="voltVal"></span></label>
-            <input type="range" id="voltKnob" min="0.1" max="3" step="0.05" value="1">
+            <input type="range" id="voltKnob" data-tip="scale" min="0.1" max="3" step="0.05" value="1">
         </div>
         <div class="knob">
             <label data-i18n="beamCurrent">BEAM CURRENT <span id="brightVal"></span></label>
-            <input type="range" id="brightKnob" min="0.2" max="4" step="0.05" value="1">
+            <input type="range" id="brightKnob" data-tip="beamCurrent" min="0.2" max="4" step="0.05" value="1">
         </div>
         <div class="knob">
             <label data-i18n="focus">FOCUS (beam width) <span id="focusVal"></span></label>
-            <input type="range" id="focusKnob" min="0.3" max="2" step="0.05" value="0.6">
+            <input type="range" id="focusKnob" data-tip="focus" min="0.3" max="2" step="0.05" value="0.6">
         </div>
         <div class="knob">
             <label data-i18n="blanking">BEAM BLANKING (Z-AXIS) <span id="blankVal"></span></label>
-            <input type="range" id="blankKnob" min="0" max="1" step="0.05" value="0.95">
+            <input type="range" id="blankKnob" data-tip="blanking" min="0" max="1" step="0.05" value="0.95">
         </div>
         <div class="knob">
             <label data-i18n="threshold">TRANSITION DETECTION THRESHOLD <span id="zThresholdVal"></span></label>
-            <input type="range" id="zThresholdKnob" min="1.5" max="4.5" step="0.1" value="2.2">
+            <input type="range" id="zThresholdKnob" data-tip="threshold" min="1.5" max="4.5" step="0.1" value="2.2">
         </div>
         <div class="knob">
             <label data-i18n="persistence">PHOSPHOR PERSISTENCE, ms <span id="persistVal"></span></label>
-            <input type="range" id="persistKnob" min="1" max="150" step="1" value="10">
+            <input type="range" id="persistKnob" data-tip="persistence" min="1" max="150" step="1" value="10">
         </div>
         <div class="knob">
             <label data-i18n="phosphorProfile">PHOSPHOR PROFILE (X-Y) <span id="phosphorVal">Standard</span></label>
-            <select id="phosphorSelect">
+            <select id="phosphorSelect" data-tip="phosphor">
                 <option value="fast" data-i18n="phosphorFast">Fast — short trail</option>
                 <option value="standard" selected data-i18n="phosphorStandard">Standard — balanced</option>
                 <option value="dual" data-i18n="phosphorDual">Dual — pronounced tail</option>
@@ -179,20 +191,21 @@
         </div>
         <div class="knob">
             <label data-i18n="glow">GLASS GLOW (GAUSSIAN) <span id="glowVal"></span></label>
-            <input type="range" id="glowKnob" min="0" max="1.5" step="0.05" value="0.45">
+            <input type="range" id="glowKnob" data-tip="glow" min="0" max="1.5" step="0.05" value="0.45">
         </div>
         <div class="knob" id="timeGroup">
             <label data-i18n="timeDiv">TIME/DIV (Y-T window, samples) <span id="timeVal"></span></label>
-            <input type="range" id="timeKnob" min="256" max="8192" step="256" value="2048">
+            <input type="range" id="timeKnob" data-tip="timeWindow" min="256" max="8192" step="256" value="2048">
         </div>
         <div class="row">
-            <div class="btn small active" id="autoBtn">AUTO BRIGHTNESS</div>
-            <div class="btn small active" id="qualBtn">QUALITY: HIGH</div>
-            <div class="btn small" id="curveBtn">TRACE: RAW</div>
+            <div class="btn small active" id="autoBtn" data-tip="autoBrightness">AUTO BRIGHTNESS</div>
+            <div class="btn small active" id="qualBtn" data-tip="quality">QUALITY: HIGH</div>
+            <div class="btn small" id="curveBtn" data-tip="curve">TRACE: RAW</div>
         </div>
     </div>
 </div>
 <div id="volumeWarning" class="volume-warning" role="status" aria-live="polite" aria-atomic="true"></div>
+<div id="uiTooltip" class="ui-tooltip" role="tooltip"></div>
 
 <script>
 (() => {
@@ -206,7 +219,7 @@ const statusEl = $('status'), fpsEl = $('fps');
 const fileInput = $('audioFile'), fileLabel = $('fileLabel');
 const micBtn = $('micBtn'), playBtn = $('playBtn'), modeBtn = $('modeBtn');
 const seekEl = $('seek'), timeLabel = $('timeLabel'), volKnob = $('volKnob');
-const volumeWarningEl = $('volumeWarning');
+const volumeWarningEl = $('volumeWarning'), uiTooltipEl = $('uiTooltip');
 const voltKnob = $('voltKnob'), brightKnob = $('brightKnob'), focusKnob = $('focusKnob'), blankKnob = $('blankKnob');
 const zThresholdKnob = $('zThresholdKnob'), phosphorSelect = $('phosphorSelect');
 const persistKnob = $('persistKnob'), glowKnob = $('glowKnob'), timeKnob = $('timeKnob');
@@ -214,10 +227,10 @@ const syncKnob = $('syncKnob');
 const timeGroup = $('timeGroup'), autoBtn = $('autoBtn'), qualBtn = $('qualBtn'), curveBtn = $('curveBtn');
 const langEnBtn = $('langEn'), langRuBtn = $('langRu'), languageRow = $('languageRow');
 
+const num = el => parseFloat(el.value);
 let isXY = true, autoBright = true, hiQuality = true, smoothPath = false;
 let volumeWarningTimer = null;
 let volumeWasAboveLimit = num(volKnob) > 0.8;
-const num = el => parseFloat(el.value);
 
 const I18N = {
     en: {
@@ -227,6 +240,31 @@ const I18N = {
         position: 'POSITION', volume: 'VOLUME', volumeWarning: 'Volume is above 80% — high listening levels may damage hearing.', sync: 'SYNC, ms', scale: 'SCALE (V/DIV)',
         beamCurrent: 'BEAM CURRENT', focus: 'FOCUS (beam width)', blanking: 'BEAM BLANKING (Z-AXIS)',
         threshold: 'TRANSITION DETECTION THRESHOLD', persistence: 'PHOSPHOR PERSISTENCE, ms',
+        tooltips: {
+            fullscreen: 'Enter or exit fullscreen mode.',
+            panel: 'Show or hide the control panel.',
+            langEn: 'Switch the interface to English.',
+            langRu: 'Переключить интерфейс на русский.',
+            file: 'Load an audio file to visualize. WAV, FLAC, MP3 and other browser-supported formats are accepted.',
+            microphone: 'Use live microphone input instead of a loaded file. Press again to stop.',
+            play: 'Play or pause the loaded audio file.',
+            mode: 'Switch between X-Y stereo vector mode and Y-T waveform-over-time mode.',
+            position: 'Move through the loaded audio track.',
+            volume: 'Set playback volume. Above 80%, a brief hearing-safety warning appears.',
+            sync: 'Shift the trace relative to audio output. Positive values delay the image.',
+            scale: 'Change the displayed signal amplitude (vertical scale).',
+            beamCurrent: 'Set the electron-beam intensity. Higher values make the trace brighter.',
+            focus: 'Adjust beam width. Lower values produce a thinner, sharper trace.',
+            blanking: 'Reduce bright connecting lines during abrupt signal jumps.',
+            threshold: 'Set how large a signal change must be before it is treated as a transition for beam blanking.',
+            persistence: 'Set how long the phosphor trace remains visible before fading.',
+            phosphor: 'Choose the simulated phosphor decay profile used in X-Y mode.',
+            glow: 'Adjust the Gaussian halo around the CRT trace.',
+            timeWindow: 'Set how many audio samples are displayed in Y-T mode.',
+            autoBrightness: 'Automatically adapt beam energy to the average length of trace segments.',
+            quality: 'High uses more rendering resolution and glow. Low reduces resolution for better performance.',
+            curve: 'Switch between raw sample-to-sample segments and Catmull-Rom curve smoothing.'
+        },
         phosphorProfile: 'PHOSPHOR PROFILE (X-Y)', phosphorFast: 'Fast — short trail',
         phosphorStandard: 'Standard — balanced', phosphorDual: 'Dual — pronounced tail',
         phosphorLong: 'Long — extended persistence', glow: 'GLASS GLOW (GAUSSIAN)',
@@ -267,6 +305,31 @@ const I18N = {
         phosphorStandard: 'Стандартный — сбалансированный', phosphorDual: 'Двойной — выраженный хвост',
         phosphorLong: 'Длинный — длительное послесвечение', glow: 'СВЕЧЕНИЕ СТЕКЛА (GAUSSIAN)',
         timeDiv: 'TIME/DIV (окно Y-T, сэмплов)', autoBrightness: 'АВТО-ЯРКОСТЬ',
+        tooltips: {
+            fullscreen: 'Включить или выключить полноэкранный режим.',
+            panel: 'Показать или скрыть панель управления.',
+            langEn: 'Switch the interface to English.',
+            langRu: 'Переключить интерфейс на русский.',
+            file: 'Загрузить аудиофайл для визуализации. Поддерживаются WAV, FLAC, MP3 и другие форматы, которые умеет открывать браузер.',
+            microphone: 'Использовать звук с микрофона вместо загруженного файла. Повторное нажатие останавливает захват.',
+            play: 'Запустить или приостановить воспроизведение загруженного аудиофайла.',
+            mode: 'Переключение между стереовекторным режимом X-Y и отображением формы сигнала во времени Y-T.',
+            position: 'Перемотка загруженной аудиозаписи.',
+            volume: 'Громкость воспроизведения. Выше 80% появляется краткое предупреждение о риске для слуха.',
+            sync: 'Сдвиг изображения относительно звука. Положительное значение задерживает изображение.',
+            scale: 'Изменение масштаба амплитуды сигнала по вертикали.',
+            beamCurrent: 'Интенсивность электронного луча. Чем выше значение, тем ярче траектория.',
+            focus: 'Толщина луча. Меньшее значение делает линию тоньше и резче.',
+            blanking: 'Ослабление ярких соединительных линий при резких скачках сигнала.',
+            threshold: 'Насколько сильным должен быть скачок сигнала, чтобы считаться переходом для гашения луча.',
+            persistence: 'Время, в течение которого след люминофора остаётся видимым перед затуханием.',
+            phosphor: 'Выбор профиля затухания люминофора в режиме X-Y.',
+            glow: 'Интенсивность гауссова ореола вокруг траектории ЭЛТ.',
+            timeWindow: 'Количество аудиосэмплов, отображаемых в режиме Y-T.',
+            autoBrightness: 'Автоматическая подстройка энергии луча по средней длине сегментов траектории.',
+            quality: 'Высокое качество использует большее разрешение и свечение. Низкое снижает разрешение ради производительности.',
+            curve: 'Переключение между прямыми отрезками RAW и сглаживанием кривой Catmull–Rom.'
+        },
         mode: xy => 'РЕЖИМ: ' + (xy ? 'X-Y' : 'Y-T'),
         quality: high => 'КАЧЕСТВО: ' + (high ? 'ВЫСОКОЕ' : 'НИЗКОЕ'),
         curve: smooth => 'ТРАЕКТОРИЯ: ' + (smooth ? 'CATMULL' : 'RAW'),
@@ -302,6 +365,80 @@ const tr = (key, ...args) => {
     const value = I18N[language][key];
     return typeof value === 'function' ? value(...args) : value;
 };
+
+let tooltipTarget = null, tooltipTimer = null;
+let tooltipPointerX = 0, tooltipPointerY = 0;
+
+function positionTooltip(x, y) {
+    const rect = uiTooltipEl.getBoundingClientRect();
+    const margin = 12, offset = 15;
+    let left = x + offset, top = y + offset;
+
+    // Prefer the lower-right of the pointer, then flip left/up when space is insufficient.
+    if (left + rect.width > window.innerWidth - margin) left = x - rect.width - offset;
+    if (top + rect.height > window.innerHeight - margin) top = y - rect.height - offset;
+
+    left = Math.max(margin, Math.min(left, window.innerWidth - rect.width - margin));
+    top = Math.max(margin, Math.min(top, window.innerHeight - rect.height - margin));
+
+    uiTooltipEl.style.left = Math.round(left) + 'px';
+    uiTooltipEl.style.top = Math.round(top) + 'px';
+}
+
+function hideTooltip() {
+    clearTimeout(tooltipTimer);
+    tooltipTimer = null;
+    tooltipTarget = null;
+    uiTooltipEl.classList.remove('visible');
+}
+
+function refreshTooltipText() {
+    if (!tooltipTarget) return;
+    const text = I18N[language].tooltips[tooltipTarget.dataset.tip];
+    if (!text) { hideTooltip(); return; }
+    uiTooltipEl.textContent = text;
+    if (uiTooltipEl.classList.contains('visible')) {
+        positionTooltip(tooltipPointerX, tooltipPointerY);
+    }
+}
+
+function bindTooltips() {
+    document.querySelectorAll('[data-tip]').forEach(target => {
+        target.addEventListener('pointerenter', event => {
+            if (event.pointerType === 'touch') return;
+            hideTooltip();
+            tooltipTarget = target;
+            tooltipPointerX = event.clientX;
+            tooltipPointerY = event.clientY;
+            tooltipTimer = setTimeout(() => {
+                if (tooltipTarget !== target) return;
+                refreshTooltipText();
+                positionTooltip(tooltipPointerX, tooltipPointerY);
+                uiTooltipEl.classList.add('visible');
+            }, 1000);
+        });
+
+        target.addEventListener('pointermove', event => {
+            if (event.pointerType === 'touch' || tooltipTarget !== target) return;
+            tooltipPointerX = event.clientX;
+            tooltipPointerY = event.clientY;
+            if (uiTooltipEl.classList.contains('visible')) {
+                positionTooltip(tooltipPointerX, tooltipPointerY);
+            }
+        });
+
+        target.addEventListener('pointerleave', () => {
+            if (tooltipTarget === target) hideTooltip();
+        });
+    });
+
+    window.addEventListener('resize', () => {
+        if (tooltipTarget && uiTooltipEl.classList.contains('visible')) {
+            positionTooltip(tooltipPointerX, tooltipPointerY);
+        }
+    });
+}
+
 function updateVolumeWarning() {
     const aboveLimit = num(volKnob) > 0.8;
     if (!aboveLimit) {
@@ -335,8 +472,9 @@ function applyLanguage() {
         const textNode = Array.from(el.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
         if (textNode) textNode.nodeValue = value + (el.tagName === 'LABEL' && el.querySelector('span') ? ' ' : '');
     });
-    $('fsBtn').title = tr('fullscreen');
-    $('panelBtn').title = tr('panel');
+    $('fsBtn').setAttribute('aria-label', tr('fullscreen'));
+    $('panelBtn').setAttribute('aria-label', tr('panel'));
+    refreshTooltipText();
     languageRow.setAttribute('aria-label', tr('language'));
     langEnBtn.classList.toggle('active', language === 'en');
     langRuBtn.classList.toggle('active', language === 'ru');
@@ -655,6 +793,7 @@ $('fsBtn').addEventListener('click', () => {
     else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
 });
 timeGroup.classList.add('hidden');
+bindTooltips();
 applyLanguage();
 
 // ───────────────────────── Размер, сетка ─────────────────────────
